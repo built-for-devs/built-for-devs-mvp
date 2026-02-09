@@ -375,7 +375,7 @@ export type Database = {
           admin_notes: string | null
           company_id: string
           created_at: string
-          created_by: string
+          created_by: string | null
           evaluation_scope: string | null
           findings_report: string | null
           goals: string[] | null
@@ -420,7 +420,7 @@ export type Database = {
           admin_notes?: string | null
           company_id: string
           created_at?: string
-          created_by: string
+          created_by?: string | null
           evaluation_scope?: string | null
           findings_report?: string | null
           goals?: string[] | null
