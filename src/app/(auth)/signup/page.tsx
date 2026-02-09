@@ -24,6 +24,7 @@ export default function SignupPage() {
   const [role, setRole] = useState<"developer" | "company">("developer");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +32,7 @@ export default function SignupPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -48,9 +49,39 @@ export default function SignupPage() {
       return;
     }
 
+    // If email confirmation is required, session will be null
+    if (!data.session) {
+      setConfirmEmail(true);
+      setLoading(false);
+      return;
+    }
+
     // Redirect to portal — middleware handles role routing
     router.refresh();
     router.push("/");
+  }
+
+  if (confirmEmail) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl">Check your email</CardTitle>
+          <CardDescription>
+            We sent a confirmation link to <strong>{email}</strong>. Click the
+            link in the email to activate your account, then come back and log
+            in.
+          </CardDescription>
+        </CardHeader>
+        <CardFooter>
+          <Link
+            href="/login"
+            className="text-sm text-muted-foreground hover:underline"
+          >
+            Back to login
+          </Link>
+        </CardFooter>
+      </Card>
+    );
   }
 
   return (
@@ -61,7 +92,7 @@ export default function SignupPage() {
           Sign up to get started with Built for Devs.
         </CardDescription>
       </CardHeader>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <CardContent className="space-y-4">
           {error && (
             <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
@@ -136,7 +167,7 @@ export default function SignupPage() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-4">
+        <CardFooter className="flex-col gap-4">
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Creating account..." : "Create account"}
           </Button>
