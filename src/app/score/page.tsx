@@ -57,7 +57,8 @@ export default function ScorePage() {
         </div>
 
         <p className="mt-12 text-center text-sm text-muted-foreground">
-          Built on a framework developed from 100+ real developer product evaluations
+          Built on a scoring framework shaped by years of hands-on developer
+          experience research and 100+ real product evaluations.
         </p>
       </main>
     </div>

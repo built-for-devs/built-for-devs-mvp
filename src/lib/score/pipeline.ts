@@ -66,28 +66,27 @@ export async function runScorePipeline(scoreId: string): Promise<void> {
     // Override score_date — Claude doesn't know today's date
     evaluation.score_date = new Date().toISOString();
 
-    // Step 3: Store results
+    // Step 3: Store results + send email (in parallel to avoid timeout)
     const processingTimeMs = Date.now() - startTime;
 
-    await supabase
-      .from("scores")
-      .update({
-        status: "complete",
-        scores: evaluation.scores,
-        red_flag_deductions: evaluation.red_flags,
-        base_score: evaluation.summary.base_score,
-        total_deductions: evaluation.summary.total_deductions,
-        final_score: evaluation.summary.final_score,
-        classification: evaluation.summary.classification,
-        full_evaluation: evaluation,
-        processing_time_ms: processingTimeMs,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", scoreId);
+    await Promise.all([
+      supabase
+        .from("scores")
+        .update({
+          status: "complete",
+          scores: evaluation.scores,
+          red_flag_deductions: evaluation.red_flags,
+          base_score: evaluation.summary.base_score,
+          total_deductions: evaluation.summary.total_deductions,
+          final_score: evaluation.summary.final_score,
+          classification: evaluation.summary.classification,
+          full_evaluation: evaluation,
+          processing_time_ms: processingTimeMs,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", scoreId),
 
-    // Step 4: Send email (best-effort)
-    try {
-      await sendEmail({
+      sendEmail({
         to: score.email,
         subject: `Your Developer Adoption Score: ${evaluation.product_name} scored ${evaluation.summary.final_score}/120`,
         react: ScoreCompleteEmail({
@@ -100,13 +99,13 @@ export async function runScorePipeline(scoreId: string): Promise<void> {
           reportUrl: `${getAppUrl()}/score/${score.slug}`,
         }),
         type: "score_complete",
-      });
-    } catch (emailErr) {
-      console.error(
-        `Score pipeline: failed to send email for ${scoreId}:`,
-        emailErr
-      );
-    }
+      }).catch((emailErr) => {
+        console.error(
+          `Score pipeline: failed to send email for ${scoreId}:`,
+          emailErr
+        );
+      }),
+    ]);
   } catch (err) {
     console.error(`Score pipeline failed for ${scoreId}:`, err);
 
