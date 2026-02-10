@@ -2,10 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getStripe } from "@/lib/stripe";
 import type { Enums } from "@/types/database";
 
 type ActionResult = { success: boolean; error?: string };
+
+function getServiceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!
+  );
+}
 
 export async function createCompanyAndContact(data: {
   name: string;
@@ -19,8 +27,11 @@ export async function createCompanyAndContact(data: {
   } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Not authenticated" };
 
+  // Use service client to bypass RLS for onboarding writes
+  const admin = getServiceClient();
+
   // Check if user already has a company
-  const { data: existing } = await supabase
+  const { data: existing } = await admin
     .from("company_contacts")
     .select("id")
     .eq("profile_id", user.id)
@@ -29,7 +40,7 @@ export async function createCompanyAndContact(data: {
   if (existing) return { success: false, error: "You already have a company" };
 
   // Create company
-  const { data: company, error: companyError } = await supabase
+  const { data: company, error: companyError } = await admin
     .from("companies")
     .insert({
       name: data.name,
@@ -43,7 +54,7 @@ export async function createCompanyAndContact(data: {
   if (companyError) return { success: false, error: companyError.message };
 
   // Create company_contact linking user to company
-  const { error: contactError } = await supabase
+  const { error: contactError } = await admin
     .from("company_contacts")
     .insert({
       company_id: company.id,
@@ -98,7 +109,18 @@ export async function createProject(data: {
   const price_per_evaluation = 399;
   const total_price = data.num_evaluations * price_per_evaluation;
 
-  const { data: project, error } = await supabase
+  // Verify user owns this company
+  const admin = getServiceClient();
+  const { data: contact } = await admin
+    .from("company_contacts")
+    .select("company_id")
+    .eq("profile_id", user.id)
+    .eq("company_id", data.company_id)
+    .maybeSingle();
+
+  if (!contact) return { success: false, error: "Not authorized for this company" };
+
+  const { data: project, error } = await admin
     .from("projects")
     .insert({
       company_id: data.company_id,
