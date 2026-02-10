@@ -2,8 +2,11 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getDevEvaluation } from "@/lib/dev/queries";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EvaluationStatusBar } from "./evaluation-status-bar";
+import { ClarityFlowEmbed } from "@/components/clarityflow-embed";
+import { buildConversationUrl } from "@/lib/clarityflow";
 
 export default async function DevEvaluationDetailPage({
   params,
@@ -115,25 +118,48 @@ export default async function DevEvaluationDetailPage({
         )}
       </div>
 
-      {/* ClarityFlow Embed Placeholder */}
+      {/* ClarityFlow Recording */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Evaluation Recording</CardTitle>
         </CardHeader>
         <CardContent>
-          {evaluation.clarityflow_conversation_id ? (
+          {evaluation.status === "invited" ? (
             <div className="rounded-md border bg-muted/30 p-8 text-center">
               <p className="text-sm text-muted-foreground">
-                ClarityFlow recording integration coming in Phase 5.
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Conversation ID: {evaluation.clarityflow_conversation_id}
+                Accept this invitation to start your recording.
               </p>
             </div>
+          ) : evaluation.status === "accepted" &&
+            evaluation.clarityflow_conversation_id ? (
+            <div className="space-y-4">
+              <div className="rounded-md border bg-muted/30 p-8 text-center space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Make sure your microphone and screen recording are turned on
+                  before you get started.
+                </p>
+                <Button asChild size="lg">
+                  <a
+                    href={buildConversationUrl(
+                      evaluation.clarityflow_conversation_id
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Start Recording
+                  </a>
+                </Button>
+              </div>
+            </div>
+          ) : evaluation.recording_embed_url &&
+            ["submitted", "in_review", "approved", "rejected", "paid"].includes(
+              evaluation.status
+            ) ? (
+            <ClarityFlowEmbed embedUrl={evaluation.recording_embed_url} />
           ) : (
             <div className="rounded-md border bg-muted/30 p-8 text-center">
               <p className="text-sm text-muted-foreground">
-                ClarityFlow recording will appear here once set up.
+                Recording is being set up. Please check back shortly.
               </p>
             </div>
           )}

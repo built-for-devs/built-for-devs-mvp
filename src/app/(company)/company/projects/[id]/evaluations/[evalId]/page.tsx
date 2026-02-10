@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CopyButton } from "./copy-button";
+import { ClarityFlowEmbed } from "@/components/clarityflow-embed";
 import { formatEnumLabel } from "@/lib/admin/filter-options";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -71,25 +72,17 @@ export default async function CompanyEvaluationDetailPage({
         </Badge>
       </div>
 
-      {/* ClarityFlow Recording Placeholder */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recording</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recordingUrl ? (
-            <div className="aspect-video rounded-lg bg-muted flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">
-                ClarityFlow recording will be embedded here (Phase 5)
-              </p>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Recording not yet available.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {/* ClarityFlow Recording */}
+      {recordingUrl && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recording</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ClarityFlowEmbed embedUrl={recordingUrl} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Transcript */}
       {transcript && (

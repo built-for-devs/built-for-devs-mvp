@@ -2,9 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import {
+  createConversation,
+  buildEmbedUrl,
+} from "@/lib/clarityflow";
 import type { TablesUpdate } from "@/types/database";
 
 type ActionResult = { success: boolean; error?: string };
+
+function getAdminClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!
+  );
+}
 
 export async function updateProfile(
   data: Omit<
@@ -65,7 +77,7 @@ export async function acceptInvitation(
   // Validate evaluation belongs to this developer and is in invited status
   const { data: evaluation } = await supabase
     .from("evaluations")
-    .select("id, status")
+    .select("id, status, projects(product_name)")
     .eq("id", evaluationId)
     .eq("developer_id", dev.id)
     .eq("status", "invited")
@@ -86,6 +98,33 @@ export async function acceptInvitation(
     .eq("id", evaluationId);
 
   if (error) return { success: false, error: error.message };
+
+  // Create ClarityFlow conversation (best-effort — don't fail the accept if this errors)
+  try {
+    const project = evaluation.projects as unknown as { product_name: string } | null;
+    const productName = project?.product_name ?? "Product";
+    const slug = `eval-${evaluationId}`;
+
+    const conversation = await createConversation(
+      `Evaluation: ${productName}`,
+      slug,
+      { anyone_can_post: true, allow_anonymous_messages: true }
+    );
+
+    // Use service client to update fields developer RLS can't write
+    const admin = getAdminClient();
+    await admin
+      .from("evaluations")
+      .update({
+        clarityflow_conversation_id: conversation.slug,
+        recording_embed_url: conversation.conversation_embed_url || buildEmbedUrl(slug),
+      })
+      .eq("id", evaluationId);
+  } catch (err) {
+    console.error("ClarityFlow conversation creation failed:", err);
+    // Invitation is still accepted — admin can set ClarityFlow fields manually
+  }
+
   revalidatePath("/dev/evaluations");
   return { success: true };
 }

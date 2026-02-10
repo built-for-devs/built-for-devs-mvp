@@ -328,6 +328,38 @@ export async function logPayment(
   return { success: true };
 }
 
+export async function updateEvaluationClarityFlow(
+  evaluationId: string,
+  data: {
+    clarityflow_conversation_id?: string | null;
+    recording_embed_url?: string | null;
+    transcript?: string | null;
+  }
+): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const updateData: Record<string, unknown> = {};
+  if ("clarityflow_conversation_id" in data)
+    updateData.clarityflow_conversation_id = data.clarityflow_conversation_id || null;
+  if ("recording_embed_url" in data)
+    updateData.recording_embed_url = data.recording_embed_url || null;
+  if ("transcript" in data) updateData.transcript = data.transcript || null;
+
+  if (data.recording_embed_url || data.transcript) {
+    updateData.recording_completed_at = new Date().toISOString();
+  }
+
+  const { error } = await supabase
+    .from("evaluations")
+    .update(updateData)
+    .eq("id", evaluationId);
+
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/evaluations");
+  revalidatePath("/admin/projects");
+  return { success: true };
+}
+
 // ============================================================
 // COMPANIES
 // ============================================================

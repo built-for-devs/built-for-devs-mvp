@@ -11,6 +11,7 @@ import {
   reviewEvaluation,
   logPayment,
   removeEvaluation,
+  updateEvaluationClarityFlow,
 } from "@/lib/admin/actions";
 import { projectStatusOptions, formatEnumLabel } from "@/lib/admin/filter-options";
 import { NotesEditor } from "@/components/admin/notes-editor";
@@ -119,6 +120,36 @@ export function ProjectActions({
     });
   }
 
+  // ClarityFlow dialog
+  const [cfDialog, setCfDialog] = useState<{
+    open: boolean;
+    evalId: string;
+    conversationId: string;
+    embedUrl: string;
+    transcript: string;
+  }>({ open: false, evalId: "", conversationId: "", embedUrl: "", transcript: "" });
+
+  function openCfDialog(ev: EvaluationWithRelations) {
+    setCfDialog({
+      open: true,
+      evalId: ev.id,
+      conversationId: ev.clarityflow_conversation_id ?? "",
+      embedUrl: ev.recording_embed_url ?? "",
+      transcript: ev.transcript ?? "",
+    });
+  }
+
+  function handleSaveCf() {
+    startTransition(async () => {
+      await updateEvaluationClarityFlow(cfDialog.evalId, {
+        clarityflow_conversation_id: cfDialog.conversationId || null,
+        recording_embed_url: cfDialog.embedUrl || null,
+        transcript: cfDialog.transcript || null,
+      });
+      setCfDialog((s) => ({ ...s, open: false }));
+    });
+  }
+
   // Findings report
   const [report, setReport] = useState(project.findings_report ?? "");
   const [showPreview, setShowPreview] = useState(false);
@@ -222,6 +253,13 @@ export function ProjectActions({
                             Review
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openCfDialog(ev)}
+                        >
+                          ClarityFlow
+                        </Button>
                         {ev.status === "invited" && (
                           <Button
                             size="sm"
@@ -483,6 +521,62 @@ export function ProjectActions({
             </Button>
             <Button onClick={handleLogPayment} disabled={isPending || !payoutRef}>
               Confirm Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ClarityFlow edit dialog */}
+      <Dialog
+        open={cfDialog.open}
+        onOpenChange={(open) => setCfDialog((s) => ({ ...s, open }))}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit ClarityFlow Fields</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Conversation ID / Slug</Label>
+              <Input
+                value={cfDialog.conversationId}
+                onChange={(e) =>
+                  setCfDialog((s) => ({ ...s, conversationId: e.target.value }))
+                }
+                placeholder="e.g., eval-abc123"
+              />
+            </div>
+            <div>
+              <Label>Recording Embed URL</Label>
+              <Input
+                value={cfDialog.embedUrl}
+                onChange={(e) =>
+                  setCfDialog((s) => ({ ...s, embedUrl: e.target.value }))
+                }
+                placeholder="https://account.clarityflow.com/embeds/..."
+              />
+            </div>
+            <div>
+              <Label>Transcript</Label>
+              <Textarea
+                value={cfDialog.transcript}
+                onChange={(e) =>
+                  setCfDialog((s) => ({ ...s, transcript: e.target.value }))
+                }
+                placeholder="Paste transcript here..."
+                rows={6}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCfDialog((s) => ({ ...s, open: false }))}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSaveCf} disabled={isPending}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
