@@ -52,6 +52,7 @@ export function ProfileOnboarding({ developer }: { developer: Developer }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Step 1: Professional Identity
   const [jobTitle, setJobTitle] = useState(developer.job_title ?? "");
@@ -130,8 +131,13 @@ export function ProfileOnboarding({ developer }: { developer: Developer }) {
 
   async function saveAndContinue() {
     setSaving(true);
-    await updateProfile(getAllData());
+    setError(null);
+    const result = await updateProfile(getAllData());
     setSaving(false);
+    if (!result.success) {
+      setError(result.error || "Failed to save profile");
+      return;
+    }
     if (step < STEPS.length - 1) {
       setStep(step + 1);
     }
@@ -139,13 +145,18 @@ export function ProfileOnboarding({ developer }: { developer: Developer }) {
 
   async function completeProfile() {
     setSaving(true);
+    setError(null);
     const data = getAllData();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (data as any).profile_complete = true;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (data as any).is_available = true;
-    await updateProfile(data);
+    const result = await updateProfile(data);
     setSaving(false);
+    if (!result.success) {
+      setError(result.error || "Failed to complete profile");
+      return;
+    }
     router.push("/dev/evaluations");
     router.refresh();
   }
@@ -165,6 +176,12 @@ export function ProfileOnboarding({ developer }: { developer: Developer }) {
           />
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       <Card>
         <CardHeader>

@@ -45,6 +45,7 @@ export function ProfileEditor({ developer }: { developer: Developer }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // All fields
   const [jobTitle, setJobTitle] = useState(developer.job_title ?? "");
@@ -82,7 +83,8 @@ export function ProfileEditor({ developer }: { developer: Developer }) {
   async function save() {
     setSaving(true);
     setSaved(false);
-    await updateProfile({
+    setError(null);
+    const result = await updateProfile({
       job_title: jobTitle || null,
       role_types: roleTypes.length > 0 ? roleTypes : null,
       years_experience: yearsExperience ? parseInt(yearsExperience, 10) : null,
@@ -114,6 +116,10 @@ export function ProfileEditor({ developer }: { developer: Developer }) {
       paypal_email: paypalEmail || null,
     } as Parameters<typeof updateProfile>[0]);
     setSaving(false);
+    if (!result.success) {
+      setError(result.error || "Failed to save profile");
+      return;
+    }
     setSaved(true);
     router.refresh();
     setTimeout(() => setSaved(false), 3000);
@@ -139,6 +145,12 @@ export function ProfileEditor({ developer }: { developer: Developer }) {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       {/* Professional Identity */}
       <Card>
