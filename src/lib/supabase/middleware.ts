@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Public routes that don't require auth
-  const publicRoutes = ["/login", "/signup", "/forgot-password"];
+  const publicRoutes = ["/login", "/signup", "/forgot-password", "/score", "/api/score"];
   const isPublicRoute = publicRoutes.some((route) =>
     pathname.startsWith(route)
   );
@@ -46,7 +46,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Authenticated user on a public route → redirect to their portal
-  if (claims && isPublicRoute) {
+  // (except /score which is accessible to everyone)
+  if (claims && isPublicRoute && !pathname.startsWith("/score") && !pathname.startsWith("/api/score")) {
     const role = (claims as Record<string, unknown>).user_metadata as Record<string, unknown> | undefined;
     const userRole = role?.role as string | undefined;
     const url = request.nextUrl.clone();
