@@ -233,9 +233,9 @@ export function ScoreReport({ evaluation }: Props) {
                   See what real developers think about your product
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Built for Devs recruits developers who match your target
-                  audience to evaluate your product while screen-recording and
-                  thinking aloud.
+                  Built for Devs helps companies building developer products
+                  get candid insights from their target developers through
+                  recorded product evaluations.
                 </p>
                 <Button asChild className="mt-4">
                   <a href="https://builtfor.dev" target="_blank" rel="noopener noreferrer">

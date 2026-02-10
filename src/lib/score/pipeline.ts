@@ -63,6 +63,9 @@ export async function runScorePipeline(scoreId: string): Promise<void> {
       crawlResult
     );
 
+    // Override score_date — Claude doesn't know today's date
+    evaluation.score_date = new Date().toISOString();
+
     // Step 3: Store results
     const processingTimeMs = Date.now() - startTime;
 
