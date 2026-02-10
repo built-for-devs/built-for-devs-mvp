@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
+import { sendEmail, getAppUrl } from "@/lib/email";
+import { CompanyPaymentConfirmationEmail } from "@/lib/email/templates/company-payment-confirmation";
 import type Stripe from "stripe";
 
 // Use service role client to bypass RLS for webhook updates
@@ -61,6 +63,36 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`Project ${projectId} marked as paid via Stripe webhook`);
+
+    // Send payment confirmation email to company (best-effort)
+    try {
+      const { data: project } = await supabase
+        .from("projects")
+        .select("product_name, companies(primary_contact_email, primary_contact_name)")
+        .eq("id", projectId)
+        .single();
+
+      const company = project?.companies as unknown as {
+        primary_contact_email: string | null;
+        primary_contact_name: string | null;
+      } | null;
+
+      if (company?.primary_contact_email) {
+        await sendEmail({
+          to: company.primary_contact_email,
+          subject: `Payment confirmed for ${project?.product_name ?? "your project"}`,
+          react: CompanyPaymentConfirmationEmail({
+            contactName: company.primary_contact_name || "there",
+            projectName: project?.product_name ?? "your project",
+            dashboardUrl: `${getAppUrl()}/company/projects/${projectId}`,
+          }),
+          type: "company_payment_confirmation",
+          projectId,
+        });
+      }
+    } catch (err) {
+      console.error("Stripe webhook: failed to send payment confirmation email:", err);
+    }
   }
 
   return NextResponse.json({ received: true });

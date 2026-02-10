@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { sendEmail, getAppUrl } from "@/lib/email";
+import { InvitationEmail } from "@/lib/email/templates/invitation";
+import { PaymentSentEmail } from "@/lib/email/templates/payment-sent";
+import { CompanyReportReadyEmail } from "@/lib/email/templates/company-report-ready";
 import type { Enums } from "@/types/database";
 
 type ActionResult = { success: boolean; error?: string };
@@ -142,6 +146,42 @@ export async function publishFindings(projectId: string): Promise<ActionResult> 
     .eq("id", projectId);
 
   if (error) return { success: false, error: error.message };
+
+  // Send report-ready email to company (best-effort)
+  try {
+    const { data: project } = await supabase
+      .from("projects")
+      .select("product_name, company_id")
+      .eq("id", projectId)
+      .single();
+
+    if (project?.company_id) {
+      const { data: contact } = await supabase
+        .from("company_contacts")
+        .select("profiles(email, full_name)")
+        .eq("company_id", project.company_id)
+        .eq("is_primary", true)
+        .single();
+
+      const profile = contact?.profiles as unknown as { email: string; full_name: string } | null;
+      if (profile?.email) {
+        await sendEmail({
+          to: profile.email,
+          subject: `Your findings report for ${project.product_name} is ready`,
+          react: CompanyReportReadyEmail({
+            contactName: profile.full_name || "there",
+            projectName: project.product_name,
+            projectUrl: `${getAppUrl()}/company/projects/${projectId}`,
+          }),
+          type: "report_ready",
+          projectId,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Failed to send report-ready email:", err);
+  }
+
   revalidatePath(`/admin/projects/${projectId}`);
   return { success: true };
 }
@@ -236,18 +276,59 @@ export async function assignDeveloperToProject(
     descriptor = parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(", ");
   }
 
-  const { error } = await supabase.from("evaluations").insert({
-    project_id: projectId,
-    developer_id: developerId,
-    status: "invited",
-    payout_amount: payoutAmount ?? 175,
-    anonymous_descriptor: descriptor,
-    invitation_expires_at: new Date(
-      Date.now() + 24 * 60 * 60 * 1000
-    ).toISOString(),
-  });
+  const { data: evaluation, error } = await supabase
+    .from("evaluations")
+    .insert({
+      project_id: projectId,
+      developer_id: developerId,
+      status: "invited",
+      payout_amount: payoutAmount ?? 175,
+      anonymous_descriptor: descriptor,
+      invitation_expires_at: new Date(
+        Date.now() + 24 * 60 * 60 * 1000
+      ).toISOString(),
+    })
+    .select("id")
+    .single();
 
   if (error) return { success: false, error: error.message };
+
+  // Send invitation email (best-effort)
+  try {
+    const { data: devProfile } = await supabase
+      .from("developers")
+      .select("profiles(email, full_name)")
+      .eq("id", developerId)
+      .single();
+
+    const { data: project } = await supabase
+      .from("projects")
+      .select("product_name")
+      .eq("id", projectId)
+      .single();
+
+    const profile = devProfile?.profiles as unknown as { email: string; full_name: string } | null;
+    if (profile?.email && project) {
+      await sendEmail({
+        to: profile.email,
+        subject: `You're invited to evaluate ${project.product_name}`,
+        react: InvitationEmail({
+          developerName: profile.full_name || "Developer",
+          productName: project.product_name,
+          payoutAmount: payoutAmount ?? 175,
+          evaluationUrl: `${getAppUrl()}/dev/evaluations/${evaluation.id}`,
+          expiresIn: "24 hours",
+        }),
+        type: "invitation",
+        recipientProfileId: undefined,
+        evaluationId: evaluation.id,
+        projectId,
+      });
+    }
+  } catch (err) {
+    console.error("Failed to send invitation email:", err);
+  }
+
   revalidatePath(`/admin/projects/${projectId}`);
   return { success: true };
 }
@@ -322,6 +403,45 @@ export async function logPayment(
     .eq("id", evaluationId);
 
   if (error) return { success: false, error: error.message };
+
+  // Send payment confirmation email (best-effort)
+  try {
+    const { data: ev } = await supabase
+      .from("evaluations")
+      .select("payout_amount, developer_id, project_id, projects(product_name)")
+      .eq("id", evaluationId)
+      .single();
+
+    if (ev?.developer_id) {
+      const { data: devProfile } = await supabase
+        .from("developers")
+        .select("profiles(email, full_name)")
+        .eq("id", ev.developer_id)
+        .single();
+
+      const profile = devProfile?.profiles as unknown as { email: string; full_name: string } | null;
+      const project = ev.projects as unknown as { product_name: string } | null;
+
+      if (profile?.email) {
+        await sendEmail({
+          to: profile.email,
+          subject: `Payment of $${ev.payout_amount} sent`,
+          react: PaymentSentEmail({
+            developerName: profile.full_name || "Developer",
+            productName: project?.product_name || "Product",
+            amount: ev.payout_amount ?? 175,
+            payoutReference,
+          }),
+          type: "payment_confirmation",
+          evaluationId,
+          projectId: ev.project_id,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Failed to send payment email:", err);
+  }
+
   revalidatePath("/admin/evaluations");
   revalidatePath("/admin/projects");
   revalidatePath("/admin/dashboard");

@@ -6,7 +6,10 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import {
   createConversation,
   buildEmbedUrl,
+  buildConversationUrl,
 } from "@/lib/clarityflow";
+import { sendEmail, getAppUrl } from "@/lib/email";
+import { AcceptanceConfirmationEmail } from "@/lib/email/templates/acceptance-confirmation";
 import type { TablesUpdate } from "@/types/database";
 
 type ActionResult = { success: boolean; error?: string };
@@ -123,6 +126,42 @@ export async function acceptInvitation(
   } catch (err) {
     console.error("ClarityFlow conversation creation failed:", err);
     // Invitation is still accepted — admin can set ClarityFlow fields manually
+  }
+
+  // Send acceptance confirmation email (best-effort)
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", user.id)
+      .single();
+
+    const project = evaluation.projects as unknown as { product_name: string } | null;
+    const productName = project?.product_name ?? "Product";
+    const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const cfSlug = `eval-${evaluationId}`;
+
+    if (profile?.email) {
+      await sendEmail({
+        to: profile.email,
+        subject: `You're in! Next steps for ${productName}`,
+        react: AcceptanceConfirmationEmail({
+          developerName: profile.full_name || "Developer",
+          productName,
+          recordingUrl: buildConversationUrl(cfSlug),
+          deadline: deadline.toLocaleDateString("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+          }),
+        }),
+        type: "acceptance_confirmation",
+        recipientProfileId: user.id,
+        evaluationId,
+      });
+    }
+  } catch (err) {
+    console.error("Failed to send acceptance email:", err);
   }
 
   revalidatePath("/dev/evaluations");

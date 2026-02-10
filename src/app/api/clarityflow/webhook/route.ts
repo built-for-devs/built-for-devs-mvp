@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getConversation } from "@/lib/clarityflow";
+import { sendEmail, getAppUrl } from "@/lib/email";
+import { CompanyEvaluationReadyEmail } from "@/lib/email/templates/company-evaluation-ready";
 
 function createServiceClient() {
   return createClient(
@@ -113,6 +115,39 @@ export async function POST(request: NextRequest) {
       console.log(
         `ClarityFlow webhook: evaluation ${evaluation.id} updated to submitted`
       );
+
+      // Send company notification email (best-effort)
+      try {
+        const { data: evalDetail } = await supabase
+          .from("evaluations")
+          .select("id, anonymous_descriptor, project_id, projects(product_name, companies(primary_contact_email, primary_contact_name))")
+          .eq("id", evaluation.id)
+          .single();
+
+        const project = evalDetail?.projects as unknown as {
+          product_name: string;
+          companies: { primary_contact_email: string | null; primary_contact_name: string | null } | null;
+        } | null;
+        const company = project?.companies;
+
+        if (company?.primary_contact_email && evalDetail) {
+          await sendEmail({
+            to: company.primary_contact_email,
+            subject: `New evaluation submitted for ${project?.product_name ?? "your project"}`,
+            react: CompanyEvaluationReadyEmail({
+              contactName: company.primary_contact_name || "there",
+              projectName: project?.product_name ?? "your project",
+              anonymousDescriptor: evalDetail.anonymous_descriptor || "A developer",
+              evaluationUrl: `${getAppUrl()}/company/projects/${evalDetail.project_id}/evaluations/${evalDetail.id}`,
+            }),
+            type: "company_evaluation_ready",
+            evaluationId: evaluation.id,
+            projectId: evalDetail.project_id,
+          });
+        }
+      } catch (emailErr) {
+        console.error("ClarityFlow webhook: failed to send evaluation-ready email:", emailErr);
+      }
     }
   } catch (err) {
     // If we can't fetch conversation details, still mark as submitted
