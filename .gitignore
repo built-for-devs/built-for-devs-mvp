@@ -36,6 +36,14 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Growth Operations skills repo (separate repo, not part of bfd-mvp)
+AGENTS.md
+CLAUDE.md
+skills/
+
+# Claude Code local settings
+.claude/settings.local.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
