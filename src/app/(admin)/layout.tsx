@@ -8,6 +8,7 @@ import {
   FolderKanban,
   ClipboardCheck,
   Building2,
+  Gauge,
   LogOut,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -18,6 +19,7 @@ const navItems: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Projects", href: "/admin/projects", icon: FolderKanban },
   { label: "Evaluations", href: "/admin/evaluations", icon: ClipboardCheck },
   { label: "Companies", href: "/admin/companies", icon: Building2 },
+  { label: "Scores", href: "/admin/scores", icon: Gauge },
 ];
 
 export default function AdminLayout({

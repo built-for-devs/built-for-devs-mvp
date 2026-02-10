@@ -70,6 +70,13 @@ export type EvaluationFilters = {
   per_page?: number;
 };
 
+export type ScoreFilters = {
+  status?: string;
+  search?: string;
+  page?: number;
+  per_page?: number;
+};
+
 // Dashboard stats
 export type DashboardStats = {
   totalDevelopers: number;

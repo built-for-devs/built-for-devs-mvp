@@ -8,6 +8,7 @@ import type {
   ProjectWithCompany,
   EvaluationFilters,
   EvaluationWithRelations,
+  ScoreFilters,
 } from "@/types/admin";
 
 type Client = SupabaseClient<Database>;
@@ -359,5 +360,53 @@ export async function getCompanyById(supabase: Client, id: string) {
     company,
     projects: projects ?? [],
     contacts: contacts ?? [],
+  };
+}
+
+// ============================================================
+// SCORES
+// ============================================================
+
+export async function getScores(
+  supabase: Client,
+  filters: ScoreFilters
+): Promise<{ data: Record<string, unknown>[]; count: number }> {
+  const page = filters.page ?? 1;
+  const perPage = filters.per_page ?? 25;
+  const from = (page - 1) * perPage;
+  const to = from + perPage - 1;
+
+  // scores table is not in generated types yet — use untyped client
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+
+  let query = client
+    .from("scores")
+    .select(
+      "id, slug, email, name, company_name, target_url, target_domain, final_score, classification, status, error_message, processing_time_ms, created_at, completed_at",
+      { count: "exact" }
+    );
+
+  if (filters.status) {
+    query = query.eq("status", filters.status);
+  }
+  if (filters.search) {
+    const s = `%${filters.search}%`;
+    query = query.or(
+      `email.ilike.${s},target_domain.ilike.${s},company_name.ilike.${s},name.ilike.${s}`
+    );
+  }
+
+  query = query.order("created_at", { ascending: false }).range(from, to);
+
+  const { data, count, error } = await query;
+  if (error) {
+    console.error("getScores error:", error);
+    return { data: [], count: 0 };
+  }
+
+  return {
+    data: (data as unknown as Record<string, unknown>[]) ?? [],
+    count: count ?? 0,
   };
 }

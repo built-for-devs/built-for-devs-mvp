@@ -1,4 +1,4 @@
-import type { DeveloperFilters, ProjectFilters, EvaluationFilters } from "@/types/admin";
+import type { DeveloperFilters, ProjectFilters, EvaluationFilters, ScoreFilters } from "@/types/admin";
 
 const ITEMS_PER_PAGE = 25;
 
@@ -85,6 +85,23 @@ export function parseEvaluationFilters(
 
   return {
     status: (get("status") as EvaluationFilters["status"]) ?? undefined,
+    search: get("search") ?? undefined,
+    page: parseIntParam(get("page")) ?? 1,
+    per_page: parseIntParam(get("per_page")) ?? ITEMS_PER_PAGE,
+  };
+}
+
+export function parseScoreFilters(
+  searchParams: Record<string, string | string[] | undefined>
+): ScoreFilters {
+  const get = (key: string): string | null => {
+    const val = searchParams[key];
+    if (Array.isArray(val)) return val[0] ?? null;
+    return val ?? null;
+  };
+
+  return {
+    status: get("status") ?? undefined,
     search: get("search") ?? undefined,
     page: parseIntParam(get("page")) ?? 1,
     per_page: parseIntParam(get("per_page")) ?? ITEMS_PER_PAGE,
