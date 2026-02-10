@@ -2,7 +2,7 @@ import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import type { ReactElement } from "react";
 
-const FROM_ADDRESS = "Built for Devs <hello@builtfor.dev>";
+const FROM_ADDRESS = "Built for Devs <hello@email.builtfor.dev>";
 
 let _resend: Resend | null = null;
 function getResend() {
