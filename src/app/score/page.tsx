@@ -16,8 +16,8 @@ export default function ScorePage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <Link href="/"><Image src="/website-logo.png" alt="Built for Devs" width={1147} height={566} className="h-7 w-auto" /></Link>
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
+          <Link href="/"><Image src="/website-logo.png" alt="Built for Devs" width={1147} height={566} className="h-9 w-auto" /></Link>
           <span className="text-xs text-muted-foreground">
             Developer Adoption Score
           </span>
