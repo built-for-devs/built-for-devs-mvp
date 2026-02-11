@@ -2,10 +2,10 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 
 const included = [
-  "Developer matched to your ICP",
-  "Unscripted screen recording",
-  "Written findings report",
-  "Delivered within days",
+  "Feedback from developers who match your actual users",
+  "See exactly where developers get stuck, in their own words",
+  "Prioritized action plan, not just raw footage",
+  "Results in days, not weeks",
 ];
 
 export function Pricing() {
