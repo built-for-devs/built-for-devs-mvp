@@ -5,15 +5,15 @@ export function Hero() {
     <section className="px-6 py-24 md:py-32">
       <div className="mx-auto max-w-4xl text-center">
         <h1 className="text-4xl font-bold leading-tight tracking-tight text-brand-dark md:text-5xl lg:text-6xl">
-          You built it for developers.{" "}
+          You&apos;re losing developers{" "}
           <span className="text-brand-green">
-            Find out why they&apos;re not using it.
+            before they even try your product.
           </span>
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-brand-gray md:text-xl">
-          Developers from our network try your product and record their honest
-          reactions. You get screen recordings and a findings report showing your
-          biggest friction points and quickest wins.
+          Most developers who drop off never come back, and never tell you
+          why. We show you exactly where they hesitate, get confused, or quit,
+          so you can remove the friction and turn drop-offs into adoption.
         </p>
         <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
           <Link
