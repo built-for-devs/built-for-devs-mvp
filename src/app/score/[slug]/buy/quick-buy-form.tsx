@@ -572,7 +572,7 @@ export function QuickBuyForm({
         </div>
 
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-6 space-y-4">
             <div className="flex items-baseline justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">
@@ -583,6 +583,24 @@ export function QuickBuyForm({
               <p className="text-2xl font-bold">
                 ${total.toLocaleString()}
               </p>
+            </div>
+            <Separator />
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Included in your package:</p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 text-green-600">✓</span>
+                  {numEvaluations} screen recording{numEvaluations > 1 ? "s" : ""} of developers trying your product cold
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 text-green-600">✓</span>
+                  Candid developer feedback and reactions
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 text-green-600">✓</span>
+                  Findings report highlighting friction points and quick wins
+                </li>
+              </ul>
             </div>
           </CardContent>
         </Card>
