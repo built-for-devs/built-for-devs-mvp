@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { ScoreForm } from "./score-form";
 import { CATEGORY_META } from "@/lib/score/types";
 
@@ -16,7 +17,7 @@ export default function ScorePage() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <span className="text-sm font-semibold">Built for Devs</span>
+          <Link href="/"><Image src="/website-logo.png" alt="Built for Devs" width={140} height={36} className="h-7 w-auto" /></Link>
           <span className="text-xs text-muted-foreground">
             Developer Adoption Score
           </span>

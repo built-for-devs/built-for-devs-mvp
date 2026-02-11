@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
 import { ScoreLoadingView } from "./score-loading-view";
 import { ScoreReport } from "./score-report";
@@ -83,7 +85,7 @@ export default async function ScoreReportPage({ params }: PageProps) {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <span className="text-sm font-semibold">Built for Devs</span>
+          <Link href="/"><Image src="/website-logo.png" alt="Built for Devs" width={140} height={36} className="h-7 w-auto" /></Link>
           <span className="text-xs text-muted-foreground">
             Developer Adoption Score
           </span>

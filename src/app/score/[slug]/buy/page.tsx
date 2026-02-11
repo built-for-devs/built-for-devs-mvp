@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
 import type { ScoreEvaluation } from "@/lib/score/types";
 import { QuickBuyForm } from "./quick-buy-form";
@@ -65,7 +67,7 @@ export default async function BuyPage({ params }: PageProps) {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <span className="text-sm font-semibold">Built for Devs</span>
+          <Link href="/"><Image src="/website-logo.png" alt="Built for Devs" width={140} height={36} className="h-7 w-auto" /></Link>
           <span className="text-xs text-muted-foreground">
             Developer Evaluations
           </span>

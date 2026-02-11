@@ -6,11 +6,8 @@ export function Nav() {
     <nav className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Built for Devs" width={28} height={28} />
-            <span className="text-sm font-semibold text-brand-dark">
-              Built for Devs
-            </span>
+          <Link href="/">
+            <Image src="/website-logo.png" alt="Built for Devs" width={140} height={36} className="h-8 w-auto" />
           </Link>
           <div className="hidden items-center gap-6 md:flex">
             <a
