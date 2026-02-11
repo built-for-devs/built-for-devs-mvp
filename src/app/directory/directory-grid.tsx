@@ -41,11 +41,6 @@ export function DirectoryGrid({ products }: Props) {
                     <p className="text-sm text-muted-foreground">
                       {product.target_domain}
                     </p>
-                    {product.company_name && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {product.company_name}
-                      </p>
-                    )}
                   </div>
                   <div className="shrink-0 text-right">
                     <span className="text-2xl font-bold tabular-nums">
