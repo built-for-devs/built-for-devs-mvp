@@ -29,16 +29,25 @@ export async function GET(
   }
 
   // Send email on first poll after completion
+  console.log(`[score-status] ${slug}: status=${data.status}, email_sent=${data.email_sent}, has_evaluation=${!!data.full_evaluation}`);
+
   if (data.status === "complete" && !data.email_sent && data.full_evaluation) {
+    console.log(`[score-status] ${slug}: Sending completion email to ${data.email}`);
+
     // Mark as sent first to prevent double-sends from concurrent polls
-    await supabase
+    const { error: flagError } = await supabase
       .from("scores")
       .update({ email_sent: true })
       .eq("slug", slug)
       .eq("email_sent", false);
 
+    if (flagError) {
+      console.error(`[score-status] ${slug}: Failed to set email_sent flag:`, flagError);
+    }
+
     const evaluation = data.full_evaluation as ScoreEvaluation;
     try {
+      console.log(`[score-status] ${slug}: Calling sendEmail with product=${evaluation.product_name}, score=${evaluation.summary?.final_score}`);
       await sendEmail({
         to: data.email,
         subject: `Your Developer Adoption Score: ${evaluation.product_name} scored ${evaluation.summary.final_score}/120`,
@@ -53,8 +62,9 @@ export async function GET(
         }),
         type: "score_complete",
       });
+      console.log(`[score-status] ${slug}: sendEmail completed successfully`);
     } catch (emailErr) {
-      console.error(`Score email failed for ${slug}:`, emailErr);
+      console.error(`[score-status] ${slug}: sendEmail threw:`, emailErr);
     }
   }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
+import { sendEmail, getAppUrl } from "@/lib/email";
+import { ScoreCompleteEmail } from "@/lib/email/templates/score-complete";
 
 export async function POST(request: NextRequest) {
   const { to } = await request.json();
@@ -8,31 +9,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing 'to' field" }, { status: 400 });
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "RESEND_API_KEY is not set", hasKey: false },
-      { status: 500 }
-    );
-  }
-
   try {
-    const resend = new Resend(apiKey);
-    const { data, error } = await resend.emails.send({
-      from: "Built for Devs <hello@email.builtfor.dev>",
+    await sendEmail({
       to,
-      subject: "Test email from Built for Devs",
-      text: "If you received this, Resend is working correctly.",
+      subject: "Test: Your Developer Adoption Score: TestProduct scored 85/120",
+      react: ScoreCompleteEmail({
+        recipientName: "Test User",
+        productName: "TestProduct",
+        finalScore: 85,
+        classification: "excellent",
+        verdict: "Strong developer experience with solid documentation.",
+        quickWins: [
+          {
+            recommendation: "Add a quickstart guide",
+            impact: "high",
+            effort: "low",
+          },
+        ],
+        reportUrl: `${getAppUrl()}/score/test123`,
+      }),
+      type: "score_complete",
     });
 
-    if (error) {
-      return NextResponse.json({ error, resendError: true }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, id: data?.id });
+    return NextResponse.json({ success: true });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error", caught: true },
+      {
+        error: err instanceof Error ? err.message : "Unknown error",
+        stack: err instanceof Error ? err.stack : undefined,
+      },
       { status: 500 }
     );
   }
