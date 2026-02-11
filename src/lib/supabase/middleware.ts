@@ -33,13 +33,13 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Public routes that don't require auth
-  const publicRoutes = ["/login", "/signup", "/forgot-password", "/score", "/api/score", "/directory"];
-  const isPublicRoute = publicRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
+  const publicPrefixes = ["/login", "/signup", "/forgot-password", "/score", "/api/score", "/directory"];
+  const isPublicRoute =
+    pathname === "/" ||
+    publicPrefixes.some((route) => pathname.startsWith(route));
 
   // Unauthenticated user on a protected route → redirect to login
-  if (!claims && !isPublicRoute && pathname !== "/") {
+  if (!claims && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -82,13 +82,6 @@ export async function updateSession(request: NextRequest) {
       url.pathname = getPortalPath(userRole);
       return NextResponse.redirect(url);
     }
-  }
-
-  // Unauthenticated on root → login
-  if (!claims && pathname === "/") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
   }
 
   return supabaseResponse;
