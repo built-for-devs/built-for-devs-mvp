@@ -4,7 +4,7 @@ export function Hero() {
   return (
     <section className="px-6 py-16 md:py-20">
       <div className="mx-auto max-w-4xl text-center">
-        <h1 className="text-4xl font-bold leading-tight tracking-tight text-brand-dark md:text-5xl lg:text-6xl">
+        <h1 className="text-4xl font-bold leading-[1.1] tracking-tight text-brand-dark md:text-5xl lg:text-6xl">
           You&apos;re losing developers{" "}
           <span className="text-brand-green">
             before they even try your product.
