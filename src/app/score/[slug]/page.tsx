@@ -96,6 +96,7 @@ export default async function ScoreReportPage({ params }: PageProps) {
           previousScore={previousScore}
           scoreHistory={scoreHistory}
           domain={score.target_domain}
+          slug={slug}
         />
       </main>
     </div>

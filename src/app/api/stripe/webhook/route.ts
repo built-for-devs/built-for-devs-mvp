@@ -3,6 +3,7 @@ import { getStripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail, getAppUrl } from "@/lib/email";
 import { CompanyPaymentConfirmationEmail } from "@/lib/email/templates/company-payment-confirmation";
+import { ScoreBuyConfirmationEmail } from "@/lib/email/templates/score-buy-confirmation";
 import type Stripe from "stripe";
 
 // Use service role client to bypass RLS for webhook updates
@@ -64,31 +65,75 @@ export async function POST(request: NextRequest) {
 
     console.log(`Project ${projectId} marked as paid via Stripe webhook`);
 
-    // Send payment confirmation email to company (best-effort)
+    // Send payment confirmation email (best-effort)
+    const isQuickBuy = session.metadata?.source === "quick_buy";
+    const scoreId = session.metadata?.score_id;
+
     try {
-      const { data: project } = await supabase
-        .from("projects")
-        .select("product_name, companies(primary_contact_email, primary_contact_name)")
-        .eq("id", projectId)
-        .single();
+      if (isQuickBuy && scoreId) {
+        // Quick buy flow: look up email from score
+        const { data: score } = await supabase
+          .from("scores")
+          .select("email, name, full_evaluation, buy_num_evaluations, slug")
+          .eq("id", scoreId)
+          .single();
 
-      const company = project?.companies as unknown as {
-        primary_contact_email: string | null;
-        primary_contact_name: string | null;
-      } | null;
+        if (score) {
+          const email = (score as Record<string, unknown>).email as string;
+          const name = ((score as Record<string, unknown>).name as string) || "there";
+          const evaluation = (score as Record<string, unknown>).full_evaluation as Record<string, unknown> | null;
+          const productName = (evaluation?.product_name as string) ?? "your product";
+          const numEvals = (score as Record<string, unknown>).buy_num_evaluations as number ?? 1;
+          const slug = (score as Record<string, unknown>).slug as string;
 
-      if (company?.primary_contact_email) {
-        await sendEmail({
-          to: company.primary_contact_email,
-          subject: `Payment confirmed for ${project?.product_name ?? "your project"}`,
-          react: CompanyPaymentConfirmationEmail({
-            contactName: company.primary_contact_name || "there",
-            projectName: project?.product_name ?? "your project",
-            dashboardUrl: `${getAppUrl()}/company/projects/${projectId}`,
-          }),
-          type: "company_payment_confirmation",
-          projectId,
-        });
+          await sendEmail({
+            to: email,
+            subject: `Your developer evaluations for ${productName} are booked`,
+            react: ScoreBuyConfirmationEmail({
+              recipientName: name,
+              productName,
+              numEvaluations: numEvals,
+              totalPrice: numEvals * 399,
+              reportUrl: `${getAppUrl()}/score/${slug}`,
+              signupUrl: `${getAppUrl()}/signup`,
+            }),
+            type: "score_buy_confirmation",
+            replyTo: "tessa@builtfor.dev",
+            projectId,
+          });
+
+          // Update score_leads to converted
+          await supabase
+            .from("score_leads")
+            .update({ follow_up_status: "converted" })
+            .eq("email", email);
+        }
+      } else {
+        // Standard company flow: look up email from company
+        const { data: project } = await supabase
+          .from("projects")
+          .select("product_name, companies(primary_contact_email, primary_contact_name)")
+          .eq("id", projectId)
+          .single();
+
+        const company = project?.companies as unknown as {
+          primary_contact_email: string | null;
+          primary_contact_name: string | null;
+        } | null;
+
+        if (company?.primary_contact_email) {
+          await sendEmail({
+            to: company.primary_contact_email,
+            subject: `Payment confirmed for ${project?.product_name ?? "your project"}`,
+            react: CompanyPaymentConfirmationEmail({
+              contactName: company.primary_contact_name || "there",
+              projectName: project?.product_name ?? "your project",
+              dashboardUrl: `${getAppUrl()}/company/projects/${projectId}`,
+            }),
+            type: "company_payment_confirmation",
+            projectId,
+          });
+        }
       }
     } catch (err) {
       console.error("Stripe webhook: failed to send payment confirmation email:", err);

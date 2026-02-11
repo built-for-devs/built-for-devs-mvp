@@ -31,6 +31,7 @@ interface Props {
   previousScore?: number | null;
   scoreHistory?: ScoreHistoryEntry[];
   domain?: string;
+  slug?: string;
 }
 
 function getScoreColor(score: number): string {
@@ -40,7 +41,7 @@ function getScoreColor(score: number): string {
   return "bg-red-500";
 }
 
-export function ScoreReport({ evaluation, previousScore, scoreHistory = [], domain }: Props) {
+export function ScoreReport({ evaluation, previousScore, scoreHistory = [], domain, slug }: Props) {
   const delta = previousScore != null ? evaluation.summary.final_score - previousScore : null;
 
   return (
@@ -252,9 +253,9 @@ export function ScoreReport({ evaluation, previousScore, scoreHistory = [], doma
                   recorded product evaluations.
                 </p>
                 <Button asChild className="mt-4">
-                  <a href="https://builtfor.dev" target="_blank" rel="noopener noreferrer">
-                    Learn About Evaluations
-                  </a>
+                  <Link href={slug ? `/score/${slug}/buy` : "https://builtfor.dev"}>
+                    Get Real Developer Feedback
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
