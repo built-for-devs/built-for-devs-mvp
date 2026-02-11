@@ -11,7 +11,7 @@ const steps = [
     number: "2",
     title: "We recruit and match",
     description:
-      "We find developers from our 6,000+ network who match your criteria and have them try your product cold.",
+      "We hand-pick developers from our 6,000+ network who match your exact criteria. Right role, right experience, right tools.",
   },
   {
     number: "3",

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function Hero() {
   return (
-    <section className="px-6 py-24 md:py-32">
+    <section className="px-6 py-16 md:py-20">
       <div className="mx-auto max-w-4xl text-center">
         <h1 className="text-4xl font-bold leading-tight tracking-tight text-brand-dark md:text-5xl lg:text-6xl">
           You&apos;re losing developers{" "}
