@@ -7,7 +7,7 @@ export function Nav() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-8">
           <Link href="/">
-            <Image src="/website-logo.png" alt="Built for Devs" width={140} height={36} className="h-8 w-auto" />
+            <Image src="/website-logo.png" alt="Built for Devs" width={1147} height={566} className="h-8 w-auto" />
           </Link>
           <div className="hidden items-center gap-6 md:flex">
             <a
