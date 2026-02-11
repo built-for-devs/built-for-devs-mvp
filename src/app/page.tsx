@@ -3,6 +3,7 @@ import { Nav } from "@/components/marketing/nav";
 import { Hero } from "@/components/marketing/hero";
 import { Problem } from "@/components/marketing/problem";
 import { HowItWorks } from "@/components/marketing/how-it-works";
+import { ProductPreview } from "@/components/marketing/product-preview";
 import { Benefits } from "@/components/marketing/benefits";
 import { Testimonial } from "@/components/marketing/testimonial";
 import { Story } from "@/components/marketing/story";
@@ -23,6 +24,7 @@ export default function HomePage() {
       <Hero />
       <Problem />
       <HowItWorks />
+      <ProductPreview />
       <Benefits />
       <Testimonial />
       <Story />
