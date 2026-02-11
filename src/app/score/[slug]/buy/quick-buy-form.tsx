@@ -548,9 +548,9 @@ export function QuickBuyForm({
               size="icon"
               className="h-8 w-8"
               onClick={() =>
-                setNumEvaluations(Math.max(1, numEvaluations - 1))
+                setNumEvaluations(Math.max(3, numEvaluations - 1))
               }
-              disabled={numEvaluations <= 1}
+              disabled={numEvaluations <= 3}
             >
               <Minus className="h-4 w-4" />
             </Button>

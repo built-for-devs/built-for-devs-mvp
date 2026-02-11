@@ -5,6 +5,7 @@ import { Problem } from "@/components/marketing/problem";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { ProductPreview } from "@/components/marketing/product-preview";
 import { Benefits } from "@/components/marketing/benefits";
+import { Pricing } from "@/components/marketing/pricing";
 import { Testimonial } from "@/components/marketing/testimonial";
 import { Story } from "@/components/marketing/story";
 import { FAQ } from "@/components/marketing/faq";
@@ -26,6 +27,7 @@ export default function HomePage() {
       <HowItWorks />
       <ProductPreview />
       <Benefits />
+      <Pricing />
       <Testimonial />
       <Story />
       <FAQ />

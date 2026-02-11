@@ -40,9 +40,9 @@ export async function POST(
   const body = (await request.json()) as CheckoutRequest;
 
   // Validate
-  if (!body.num_evaluations || body.num_evaluations < 1) {
+  if (!body.num_evaluations || body.num_evaluations < 3) {
     return NextResponse.json(
-      { error: "At least 1 evaluation is required" },
+      { error: "At least 3 evaluations are required" },
       { status: 400 }
     );
   }

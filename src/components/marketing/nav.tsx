@@ -16,6 +16,12 @@ export function Nav() {
             >
               How It Works
             </a>
+            <a
+              href="#pricing"
+              className="text-sm text-brand-gray hover:text-brand-dark"
+            >
+              Pricing
+            </a>
             <Link
               href="/score"
               className="text-sm text-brand-gray hover:text-brand-dark"
