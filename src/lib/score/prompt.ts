@@ -147,22 +147,33 @@ export function buildUserMessage(
   targetUrl: string,
   crawlResult: CrawlResult
 ): string {
-  let message = `Evaluate the developer-facing product at ${targetUrl}.\n\nHere is the content crawled from their website:\n\n`;
+  let message = `Evaluate the developer-facing product at ${targetUrl}.\n\n`;
+
+  // Summarize crawl results so the model knows what succeeded
+  const successful = crawlResult.pages.filter((p) => p.status === "success");
+  const failed = crawlResult.pages.filter((p) => p.status === "failed" || p.status === "skipped");
+
+  message += `## Crawl Summary\n`;
+  message += `- Successfully crawled ${successful.length} page(s): ${successful.map((p) => p.label).join(", ")}\n`;
+  if (failed.length > 0) {
+    message += `- Could not reach ${failed.length} page(s): ${failed.map((p) => `${p.label} (${p.error})`).join(", ")}\n`;
+  }
+  message += `\nIMPORTANT: Some pages may not have been reachable by our automated crawler but could still exist. If the crawled homepage content contains links or references to documentation, API references, or other resources, acknowledge their existence even if we could not crawl the page directly. Only flag "No documentation visible" if there are genuinely no docs links anywhere in the crawled content.\n\n`;
+
+  message += `## Crawled Content\n\n`;
 
   for (const page of crawlResult.pages) {
     if (page.status === "success") {
-      message += `## ${page.label} (${page.url})\n${page.content}\n\n`;
-    } else if (page.status === "failed") {
-      message += `## ${page.label} (${page.url})\n[Crawl failed: ${page.error}]\n\n`;
+      message += `### ${page.label} (${page.url})\n${page.content}\n\n`;
     }
   }
 
   message += `---\n\nEvaluate this product using the Developer Adoption Score framework. Return your evaluation as a JSON object matching this exact schema:\n\n`;
   message += JSON_SCHEMA;
   message += `\n\nRemember:\n`;
-  message += `- Score based ONLY on the crawled content above\n`;
+  message += `- Score based on the crawled content above, but also consider documentation/resources that are clearly LINKED from the crawled pages even if we couldn't crawl them directly\n`;
   message += `- Be specific in evidence — reference actual content you can see\n`;
-  message += `- Apply all matching red flag deductions\n`;
+  message += `- Apply red flag deductions only when there is clear evidence of the issue — not merely because a page was unreachable by our crawler\n`;
   message += `- "what_ai_cant_tell_you" must be specific to THIS product\n`;
   message += `- Return ONLY valid JSON, no other text\n`;
 
