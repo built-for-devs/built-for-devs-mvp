@@ -66,6 +66,7 @@ export default async function AdminDevelopersPage({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Job Title</TableHead>
                     <TableHead>Role Types</TableHead>
                     <TableHead>Seniority</TableHead>
                     <TableHead>Exp</TableHead>
@@ -88,6 +89,9 @@ export default async function AdminDevelopersPage({
                         <p className="text-xs text-muted-foreground">
                           {dev.profiles.email}
                         </p>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {dev.job_title ?? "—"}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
