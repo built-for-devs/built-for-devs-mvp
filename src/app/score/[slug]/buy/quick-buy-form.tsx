@@ -536,7 +536,7 @@ export function QuickBuyForm({
           <h2 className="text-xl font-semibold">Choose your package</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Each evaluation includes a screen recording of a matched developer
-            trying your product cold, plus their candid feedback.
+            using your product for the first time, plus their candid feedback.
           </p>
         </div>
 
@@ -590,7 +590,7 @@ export function QuickBuyForm({
               <ul className="space-y-1.5 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 text-green-600">✓</span>
-                  {numEvaluations} screen recording{numEvaluations > 1 ? "s" : ""} of developers trying your product cold
+                  {numEvaluations} screen recording{numEvaluations > 1 ? "s" : ""} of developers using your product for the first time
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="mt-0.5 text-green-600">✓</span>

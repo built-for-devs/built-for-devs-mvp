@@ -88,6 +88,9 @@ export async function updateDeveloperProfile(
     linkedin_url?: string;
     github_url?: string;
     paypal_email?: string;
+    role_types?: string[];
+    seniority?: string;
+    languages?: string[];
   }
 ): Promise<ActionResult> {
   const supabase = await createClient();

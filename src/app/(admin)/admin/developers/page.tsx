@@ -3,22 +3,20 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getDevelopersWithProfiles } from "@/lib/admin/queries";
 import { parseDeveloperFilters } from "@/lib/admin/search-params";
-import { formatEnumLabel } from "@/lib/admin/filter-options";
 import { PageHeader } from "@/components/admin/page-header";
 import { DeveloperFilterPanel } from "@/components/admin/developer-filter-panel";
 import { TextSearch } from "@/components/admin/text-search";
 import { PaginationControls } from "@/components/admin/pagination-controls";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, Linkedin } from "lucide-react";
+import { Upload } from "lucide-react";
+import { DeveloperRowEditor } from "./developer-row-editor";
 
 export default async function AdminDevelopersPage({
   searchParams,
@@ -68,97 +66,18 @@ export default async function AdminDevelopersPage({
                     <TableHead>Name</TableHead>
                     <TableHead className="w-10"></TableHead>
                     <TableHead>Job Title</TableHead>
+                    <TableHead>Company</TableHead>
                     <TableHead>Role Types</TableHead>
                     <TableHead>Seniority</TableHead>
                     <TableHead>Exp</TableHead>
                     <TableHead>Languages</TableHead>
-                    <TableHead>Company</TableHead>
                     <TableHead>Available</TableHead>
                     <TableHead className="text-right">Evals</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {developers.map((dev) => (
-                    <TableRow key={dev.id}>
-                      <TableCell>
-                        <Link
-                          href={`/admin/developers/${dev.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {dev.profiles.full_name}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">
-                          {dev.profiles.email}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        {dev.linkedin_url ? (
-                          <a
-                            href={dev.linkedin_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-foreground"
-                          >
-                            <Linkedin className="h-4 w-4" />
-                          </a>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {dev.job_title ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {(dev.role_types ?? []).slice(0, 2).map((rt) => (
-                            <Badge key={rt} variant="secondary" className="text-xs">
-                              {rt}
-                            </Badge>
-                          ))}
-                          {(dev.role_types?.length ?? 0) > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{(dev.role_types?.length ?? 0) - 2}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {dev.seniority
-                          ? formatEnumLabel(dev.seniority)
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {dev.years_experience != null
-                          ? `${dev.years_experience}y`
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {(dev.languages ?? []).slice(0, 3).map((lang) => (
-                            <Badge key={lang} variant="outline" className="text-xs">
-                              {lang}
-                            </Badge>
-                          ))}
-                          {(dev.languages?.length ?? 0) > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{(dev.languages?.length ?? 0) - 3}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {dev.current_company ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={dev.is_available ? "default" : "secondary"}
-                          className="text-xs"
-                        >
-                          {dev.is_available ? "Yes" : "No"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        {dev.total_evaluations}
-                      </TableCell>
-                    </TableRow>
+                    <DeveloperRowEditor key={dev.id} dev={dev} />
                   ))}
                 </TableBody>
               </Table>
