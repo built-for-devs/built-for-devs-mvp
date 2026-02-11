@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -7,11 +8,32 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-const faqs = [
+const faqs: { question: string; answer: ReactNode }[] = [
   {
     question: "What kind of developers do the evaluations?",
     answer:
       "Our network is 6,000+ developers, mostly US-based, spanning frontend, backend, full-stack, mobile, DevOps, and more. We match them to your product based on language, experience level, specialization, and other criteria you define.",
+  },
+  {
+    question: "Can I see an example evaluation?",
+    answer: (
+      <div className="space-y-3">
+        <p>
+          Here&apos;s an example of what a developer evaluation looks like. This
+          is a real screen recording of a developer trying a product for the
+          first time.
+        </p>
+        <div className="relative aspect-video w-full overflow-hidden rounded-lg">
+          <iframe
+            src="https://www.youtube.com/embed/USlw80mI2lY"
+            title="Example developer evaluation"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 h-full w-full"
+          />
+        </div>
+      </div>
+    ),
   },
   {
     question: "How fast do I get results?",
