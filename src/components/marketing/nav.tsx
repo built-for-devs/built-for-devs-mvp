@@ -23,6 +23,12 @@ export function Nav() {
               Pricing
             </a>
             <Link
+              href="/blog"
+              className="text-sm text-brand-gray hover:text-brand-dark"
+            >
+              Blog
+            </Link>
+            <Link
               href="/score"
               className="text-sm text-brand-gray hover:text-brand-dark"
             >
