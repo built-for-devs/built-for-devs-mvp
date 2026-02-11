@@ -10,6 +10,7 @@ import { Testimonial } from "@/components/marketing/testimonial";
 import { Story } from "@/components/marketing/story";
 import { FAQ } from "@/components/marketing/faq";
 import { BottomCTA } from "@/components/marketing/cta";
+import { DeveloperCallout } from "@/components/marketing/developer-callout";
 import { Footer } from "@/components/marketing/footer";
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default function HomePage() {
       <Pricing />
       <Testimonial />
       <Story />
+      <DeveloperCallout />
       <FAQ />
       <BottomCTA />
       <Footer />

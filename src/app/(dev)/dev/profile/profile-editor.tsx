@@ -35,6 +35,7 @@ import {
   buyingInfluenceOptions,
   paidToolOptions,
   ossActivityOptions,
+  countryOptions,
   timezoneOptions,
 } from "@/lib/admin/filter-options";
 import type { Tables } from "@/types/database";
@@ -339,7 +340,13 @@ export function ProfileEditor({ developer }: { developer: Developer }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Country</Label>
-              <Input value={country} onChange={(e) => setCountry(e.target.value)} />
+              <SearchableSelect
+                options={countryOptions}
+                value={country}
+                onChange={setCountry}
+                placeholder="Select country..."
+                searchPlaceholder="Search countries..."
+              />
             </div>
             <div className="space-y-2">
               <Label>State / Region</Label>

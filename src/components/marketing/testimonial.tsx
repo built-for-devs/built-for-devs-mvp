@@ -1,6 +1,6 @@
 export function Testimonial() {
   return (
-    <section className="px-6 py-20">
+    <section className="bg-brand-light px-6 py-20">
       <div className="mx-auto max-w-3xl text-center">
         <h2 className="text-3xl font-bold text-brand-dark">
           Hear it from our clients

@@ -15,7 +15,7 @@ const steps = [
   },
   {
     number: "3",
-    title: "They try your product (on camera)",
+    title: "They try your product (screen-recorded)",
     description:
       "Developers navigate your product for the first time while screen-recording and thinking out loud. No scripts. No guidance. Just an honest first experience.",
   },

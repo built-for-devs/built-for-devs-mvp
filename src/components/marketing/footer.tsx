@@ -31,6 +31,12 @@ export function Footer() {
             Product Directory
           </Link>
           <Link
+            href="/developers"
+            className="text-sm text-brand-gray hover:text-brand-dark"
+          >
+            Evaluate Products
+          </Link>
+          <Link
             href="/login"
             className="text-sm text-brand-gray hover:text-brand-dark"
           >

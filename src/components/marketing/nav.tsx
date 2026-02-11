@@ -10,24 +10,6 @@ export function Nav() {
             <Image src="/website-logo.png" alt="Built for Devs" width={1147} height={566} className="h-9 w-auto" />
           </Link>
           <div className="hidden items-center gap-6 md:flex">
-            <a
-              href="#how-it-works"
-              className="text-sm text-brand-gray hover:text-brand-dark"
-            >
-              How It Works
-            </a>
-            <a
-              href="#pricing"
-              className="text-sm text-brand-gray hover:text-brand-dark"
-            >
-              Pricing
-            </a>
-            <Link
-              href="/blog"
-              className="text-sm text-brand-gray hover:text-brand-dark"
-            >
-              Blog
-            </Link>
             <Link
               href="/score"
               className="text-sm text-brand-gray hover:text-brand-dark"
@@ -39,6 +21,18 @@ export function Nav() {
               className="text-sm text-brand-gray hover:text-brand-dark"
             >
               Product Directory
+            </Link>
+            <Link
+              href="/developers"
+              className="text-sm text-brand-gray hover:text-brand-dark"
+            >
+              Evaluate Products
+            </Link>
+            <Link
+              href="/blog"
+              className="text-sm text-brand-gray hover:text-brand-dark"
+            >
+              Blog
             </Link>
           </div>
         </div>

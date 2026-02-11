@@ -633,16 +633,7 @@ export type Database = {
         | "report_drafting"
         | "delivered"
         | "closed"
-      seniority_level:
-        | "junior"
-        | "mid"
-        | "senior"
-        | "staff"
-        | "principal"
-        | "lead"
-        | "manager"
-        | "director"
-        | "vp_plus"
+      seniority_level: "early_career" | "senior" | "leadership"
       user_role: "developer" | "company" | "admin"
     }
     CompositeTypes: {
@@ -810,15 +801,9 @@ export const Constants = {
         "closed",
       ],
       seniority_level: [
-        "junior",
-        "mid",
+        "early_career",
         "senior",
-        "staff",
-        "principal",
-        "lead",
-        "manager",
-        "director",
-        "vp_plus",
+        "leadership",
       ],
       user_role: ["developer", "company", "admin"],
     },

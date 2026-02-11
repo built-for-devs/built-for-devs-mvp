@@ -15,10 +15,12 @@ export default async function DevProfilePage() {
   if (!developer.profile_complete) {
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold">Complete Your Profile</h1>
-          <p className="text-sm text-muted-foreground">
-            Tell us about yourself so we can match you with relevant evaluations.
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold">Welcome to Built for Devs</h1>
+          <p className="mt-2 text-muted-foreground">
+            Tell us a few things so we can match you with paid evaluations.
+            This takes about 2 minutes. After you&apos;re set up, we&apos;ll
+            match you with products that fit your skills.
           </p>
         </div>
         <ProfileOnboarding developer={developer} />

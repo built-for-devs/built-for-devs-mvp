@@ -132,7 +132,7 @@ export async function POST(
   // Anonymize developer data
   const samples: AnonymizedDeveloper[] = (data ?? []).map((dev: Record<string, unknown>) => {
     const roleTypes = (dev.role_types as string[]) ?? [];
-    const seniority = (dev.seniority as string) ?? "mid";
+    const seniority = (dev.seniority as string) ?? "senior";
     const primaryRole = roleTypes[0] ?? "developer";
 
     // Build descriptor like "Senior Backend Engineer"
