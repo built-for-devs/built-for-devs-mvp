@@ -19,6 +19,15 @@ interface CheckoutRequest {
     databases?: string[];
     cloud_platforms?: string[];
     industries?: string[];
+    devops_tools?: string[];
+    cicd_tools?: string[];
+    testing_frameworks?: string[];
+    api_experience?: string[];
+    operating_systems?: string[];
+    company_size?: string[];
+    buying_influence?: string[];
+    paid_tools?: string[];
+    open_source_activity?: string[];
   };
   num_evaluations: number;
 }
@@ -154,6 +163,15 @@ export async function POST(
         icp_databases: icp.databases?.length ? icp.databases : null,
         icp_cloud_platforms: icp.cloud_platforms?.length ? icp.cloud_platforms : null,
         icp_industries: icp.industries?.length ? icp.industries : null,
+        icp_devops_tools: icp.devops_tools?.length ? icp.devops_tools : null,
+        icp_cicd_tools: icp.cicd_tools?.length ? icp.cicd_tools : null,
+        icp_testing_frameworks: icp.testing_frameworks?.length ? icp.testing_frameworks : null,
+        icp_api_experience: icp.api_experience?.length ? icp.api_experience : null,
+        icp_operating_systems: icp.operating_systems?.length ? icp.operating_systems : null,
+        icp_company_size_range: icp.company_size?.length ? icp.company_size : null,
+        icp_buying_influence: icp.buying_influence?.length ? icp.buying_influence : null,
+        icp_paid_tools: icp.paid_tools?.length ? icp.paid_tools : null,
+        icp_open_source_activity: icp.open_source_activity?.length ? icp.open_source_activity : null,
       })
       .select("id")
       .single();
@@ -188,6 +206,15 @@ export async function POST(
         icp_databases: icp.databases?.length ? icp.databases : null,
         icp_cloud_platforms: icp.cloud_platforms?.length ? icp.cloud_platforms : null,
         icp_industries: icp.industries?.length ? icp.industries : null,
+        icp_devops_tools: icp.devops_tools?.length ? icp.devops_tools : null,
+        icp_cicd_tools: icp.cicd_tools?.length ? icp.cicd_tools : null,
+        icp_testing_frameworks: icp.testing_frameworks?.length ? icp.testing_frameworks : null,
+        icp_api_experience: icp.api_experience?.length ? icp.api_experience : null,
+        icp_operating_systems: icp.operating_systems?.length ? icp.operating_systems : null,
+        icp_company_size_range: icp.company_size?.length ? icp.company_size : null,
+        icp_buying_influence: icp.buying_influence?.length ? icp.buying_influence : null,
+        icp_paid_tools: icp.paid_tools?.length ? icp.paid_tools : null,
+        icp_open_source_activity: icp.open_source_activity?.length ? icp.open_source_activity : null,
       })
       .eq("id", projectId);
   }

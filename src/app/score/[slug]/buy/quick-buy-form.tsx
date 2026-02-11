@@ -16,6 +16,15 @@ import {
   databaseOptions,
   cloudPlatformOptions,
   industryOptions,
+  devopsToolOptions,
+  cicdToolOptions,
+  testingFrameworkOptions,
+  apiExperienceOptions,
+  operatingSystemOptions,
+  companySizeOptions,
+  buyingInfluenceOptions,
+  paidToolOptions,
+  ossActivityOptions,
   formatEnumLabel,
 } from "@/lib/admin/filter-options";
 import {
@@ -67,6 +76,15 @@ export function QuickBuyForm({
   const [databases, setDatabases] = useState<string[]>([]);
   const [cloudPlatforms, setCloudPlatforms] = useState<string[]>([]);
   const [industries, setIndustries] = useState<string[]>([]);
+  const [devopsTools, setDevopsTools] = useState<string[]>([]);
+  const [cicdTools, setCicdTools] = useState<string[]>([]);
+  const [testingFrameworks, setTestingFrameworks] = useState<string[]>([]);
+  const [apiExperience, setApiExperience] = useState<string[]>([]);
+  const [operatingSystems, setOperatingSystems] = useState<string[]>([]);
+  const [companySize, setCompanySize] = useState<string[]>([]);
+  const [buyingInfluence, setBuyingInfluence] = useState<string[]>([]);
+  const [paidTools, setPaidTools] = useState<string[]>([]);
+  const [ossActivity, setOssActivity] = useState<string[]>([]);
 
   // UI state
   const [showRefinement, setShowRefinement] = useState(false);
@@ -92,7 +110,16 @@ export function QuickBuyForm({
       frameworks.length > 0 ||
       databases.length > 0 ||
       cloudPlatforms.length > 0 ||
-      industries.length > 0;
+      industries.length > 0 ||
+      devopsTools.length > 0 ||
+      cicdTools.length > 0 ||
+      testingFrameworks.length > 0 ||
+      apiExperience.length > 0 ||
+      operatingSystems.length > 0 ||
+      companySize.length > 0 ||
+      buyingInfluence.length > 0 ||
+      paidTools.length > 0 ||
+      ossActivity.length > 0;
 
     if (!hasAnyFilter) {
       setMatchPreview(null);
@@ -113,6 +140,15 @@ export function QuickBuyForm({
           databases: databases.length ? databases : undefined,
           cloud_platforms: cloudPlatforms.length ? cloudPlatforms : undefined,
           industries: industries.length ? industries : undefined,
+          devops_tools: devopsTools.length ? devopsTools : undefined,
+          cicd_tools: cicdTools.length ? cicdTools : undefined,
+          testing_frameworks: testingFrameworks.length ? testingFrameworks : undefined,
+          api_experience: apiExperience.length ? apiExperience : undefined,
+          operating_systems: operatingSystems.length ? operatingSystems : undefined,
+          company_size: companySize.length ? companySize : undefined,
+          buying_influence: buyingInfluence.length ? buyingInfluence : undefined,
+          paid_tools: paidTools.length ? paidTools : undefined,
+          open_source_activity: ossActivity.length ? ossActivity : undefined,
         }),
       });
       if (res.ok) {
@@ -124,7 +160,7 @@ export function QuickBuyForm({
     } finally {
       setMatchLoading(false);
     }
-  }, [slug, roleTypes, seniorityLevels, languages, minExperience, frameworks, databases, cloudPlatforms, industries]);
+  }, [slug, roleTypes, seniorityLevels, languages, minExperience, frameworks, databases, cloudPlatforms, industries, devopsTools, cicdTools, testingFrameworks, apiExperience, operatingSystems, companySize, buyingInfluence, paidTools, ossActivity]);
 
   // Debounced match preview
   useEffect(() => {
@@ -154,6 +190,15 @@ export function QuickBuyForm({
             databases: databases.length ? databases : undefined,
             cloud_platforms: cloudPlatforms.length ? cloudPlatforms : undefined,
             industries: industries.length ? industries : undefined,
+            devops_tools: devopsTools.length ? devopsTools : undefined,
+            cicd_tools: cicdTools.length ? cicdTools : undefined,
+            testing_frameworks: testingFrameworks.length ? testingFrameworks : undefined,
+            api_experience: apiExperience.length ? apiExperience : undefined,
+            operating_systems: operatingSystems.length ? operatingSystems : undefined,
+            company_size: companySize.length ? companySize : undefined,
+            buying_influence: buyingInfluence.length ? buyingInfluence : undefined,
+            paid_tools: paidTools.length ? paidTools : undefined,
+            open_source_activity: ossActivity.length ? ossActivity : undefined,
           },
           num_evaluations: numEvaluations,
         }),
@@ -281,8 +326,8 @@ export function QuickBuyForm({
           ) : (
             <ChevronDown className="h-4 w-4" />
           )}
-          {showRefinement ? "Hide" : "Refine further"} (frameworks, databases,
-          cloud, industries)
+          {showRefinement ? "Hide" : "Refine further"} (frameworks, buying
+          influence, tools, and more)
         </button>
 
         {showRefinement && (
@@ -325,6 +370,96 @@ export function QuickBuyForm({
                 selected={industries}
                 onChange={setIndustries}
                 placeholder="e.g. SaaS, FinTech..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Buying Influence</Label>
+              <TagInput
+                label="Buying Influence"
+                options={[...buyingInfluenceOptions]}
+                selected={buyingInfluence}
+                onChange={setBuyingInfluence}
+                placeholder="e.g. Decision Maker..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Company Size</Label>
+              <TagInput
+                label="Company Size"
+                options={[...companySizeOptions]}
+                selected={companySize}
+                onChange={setCompanySize}
+                placeholder="e.g. 11-50, 51-200..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>DevOps Tools</Label>
+              <TagInput
+                label="DevOps Tools"
+                options={devopsToolOptions}
+                selected={devopsTools}
+                onChange={setDevopsTools}
+                placeholder="e.g. Docker, Kubernetes..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>CI/CD Tools</Label>
+              <TagInput
+                label="CI/CD Tools"
+                options={cicdToolOptions}
+                selected={cicdTools}
+                onChange={setCicdTools}
+                placeholder="e.g. GitHub Actions..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Testing Frameworks</Label>
+              <TagInput
+                label="Testing Frameworks"
+                options={testingFrameworkOptions}
+                selected={testingFrameworks}
+                onChange={setTestingFrameworks}
+                placeholder="e.g. Jest, Playwright..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>API Experience</Label>
+              <TagInput
+                label="API Experience"
+                options={apiExperienceOptions}
+                selected={apiExperience}
+                onChange={setApiExperience}
+                placeholder="e.g. REST, GraphQL..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Operating Systems</Label>
+              <TagInput
+                label="Operating Systems"
+                options={operatingSystemOptions}
+                selected={operatingSystems}
+                onChange={setOperatingSystems}
+                placeholder="e.g. macOS, Linux..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Paid Tools</Label>
+              <TagInput
+                label="Paid Tools"
+                options={paidToolOptions}
+                selected={paidTools}
+                onChange={setPaidTools}
+                placeholder="e.g. GitHub, Jira..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Open Source Activity</Label>
+              <TagInput
+                label="Open Source Activity"
+                options={[...ossActivityOptions]}
+                selected={ossActivity}
+                onChange={setOssActivity}
+                placeholder="e.g. Regular, Maintainer..."
               />
             </div>
           </div>

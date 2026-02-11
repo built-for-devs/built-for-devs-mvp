@@ -18,6 +18,15 @@ interface MatchPreviewRequest {
   databases?: string[];
   cloud_platforms?: string[];
   industries?: string[];
+  devops_tools?: string[];
+  cicd_tools?: string[];
+  testing_frameworks?: string[];
+  api_experience?: string[];
+  operating_systems?: string[];
+  company_size?: string[];
+  buying_influence?: string[];
+  paid_tools?: string[];
+  open_source_activity?: string[];
 }
 
 interface AnonymizedDeveloper {
@@ -48,12 +57,11 @@ export async function POST(
     return NextResponse.json({ error: "Score not found" }, { status: 404 });
   }
 
-  // Build developer match query
+  // Build developer match query — don't require profile_complete or is_available
+  // since the network is still growing. Show all developers who have profiles.
   let query = (supabase as unknown as { from: (table: string) => ReturnType<typeof supabase.from> })
     .from("developers")
-    .select("job_title, years_experience, seniority, languages, frameworks, role_types", { count: "exact" })
-    .eq("is_available", true)
-    .eq("profile_complete", true);
+    .select("job_title, years_experience, seniority, languages, frameworks, role_types", { count: "exact" });
 
   // Apply array overlap filters
   if (body.role_types?.length) {
@@ -80,6 +88,36 @@ export async function POST(
   }
   if (body.industries?.length) {
     query = query.overlaps("industries", body.industries);
+  }
+  if (body.devops_tools?.length) {
+    query = query.overlaps("devops_tools", body.devops_tools);
+  }
+  if (body.cicd_tools?.length) {
+    query = query.overlaps("cicd_tools", body.cicd_tools);
+  }
+  if (body.testing_frameworks?.length) {
+    query = query.overlaps("testing_frameworks", body.testing_frameworks);
+  }
+  if (body.api_experience?.length) {
+    query = query.overlaps("api_experience", body.api_experience);
+  }
+  if (body.operating_systems?.length) {
+    query = query.overlaps("operating_systems", body.operating_systems);
+  }
+  if (body.company_size?.length) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query = query.in("company_size", body.company_size as any);
+  }
+  if (body.buying_influence?.length) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query = query.in("buying_influence", body.buying_influence as any);
+  }
+  if (body.paid_tools?.length) {
+    query = query.overlaps("paid_tools", body.paid_tools);
+  }
+  if (body.open_source_activity?.length) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    query = query.in("open_source_activity", body.open_source_activity as any);
   }
 
   query = query.limit(6);
