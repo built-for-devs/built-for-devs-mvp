@@ -72,20 +72,20 @@ export default async function AdminDashboardPage() {
 
       {/* Needs Attention sections */}
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        {/* Projects needing developer assignment */}
+        {/* Active projects */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Projects Needing Assignment</CardTitle>
+            <CardTitle className="text-base">Active Projects</CardTitle>
           </CardHeader>
           <CardContent>
             {needsAssignment.length === 0 ? (
-              <p className="text-sm text-muted-foreground">All caught up!</p>
+              <p className="text-sm text-muted-foreground">No active projects.</p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Product</TableHead>
-                    <TableHead>Company</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Evals</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -99,9 +99,12 @@ export default async function AdminDashboardPage() {
                         >
                           {project.product_name}
                         </Link>
+                        <p className="text-xs text-muted-foreground">
+                          {(project.companies as { name: string } | null)?.name ?? "—"}
+                        </p>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {(project.companies as { name: string } | null)?.name ?? "—"}
+                      <TableCell className="text-xs capitalize text-muted-foreground">
+                        {(project.status as string).replace(/_/g, " ")}
                       </TableCell>
                       <TableCell className="text-right text-sm">
                         {project.num_evaluations}

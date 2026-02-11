@@ -37,7 +37,7 @@ export async function getDashboardStats(supabase: Client): Promise<DashboardStat
       supabase
         .from("evaluations")
         .select("*", { count: "exact", head: true })
-        .eq("status", "submitted"),
+        .in("status", ["submitted", "in_review"]),
       supabase
         .from("evaluations")
         .select("*", { count: "exact", head: true })
@@ -92,8 +92,8 @@ export async function getScoreStats(supabase: Client) {
 export async function getNeedsAttentionProjects(supabase: Client) {
   const { data } = await supabase
     .from("projects")
-    .select("id, product_name, num_evaluations, created_at, companies(name)")
-    .eq("status", "paid")
+    .select("id, product_name, status, num_evaluations, created_at, companies(name)")
+    .not("status", "in", '("draft","closed","delivered")')
     .order("created_at", { ascending: true })
     .limit(10);
   return data ?? [];
@@ -103,9 +103,9 @@ export async function getNeedsReviewEvaluations(supabase: Client) {
   const { data } = await supabase
     .from("evaluations")
     .select(
-      "id, project_id, recording_completed_at, developers(id, profile_id, profiles(full_name)), projects(product_name)"
+      "id, project_id, status, recording_completed_at, developers(id, profile_id, profiles(full_name)), projects(product_name)"
     )
-    .eq("status", "submitted")
+    .in("status", ["submitted", "in_review"])
     .order("recording_completed_at", { ascending: true })
     .limit(10);
   return data ?? [];
