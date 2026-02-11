@@ -18,6 +18,15 @@ function createServiceClient() {
 
 type ActionResult = { success: boolean; error?: string };
 
+async function requireAdmin(): Promise<ActionResult | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || user.user_metadata?.role !== "admin") {
+    return { success: false, error: "Unauthorized" };
+  }
+  return null;
+}
+
 // ============================================================
 // DEVELOPERS
 // ============================================================
@@ -563,8 +572,10 @@ export async function importDevelopers(
   }[],
   importSource: string
 ): Promise<{ success: boolean; imported: number; skipped: number; errors: string[] }> {
-  const supabase = await createClient();
-  const serviceClient = createServiceClient();
+  const authErr = await requireAdmin();
+  if (authErr) return { success: false, imported: 0, skipped: 0, errors: [authErr.error ?? "Unauthorized"] };
+
+  const supabase = createServiceClient();
   let imported = 0;
   let skipped = 0;
   const errors: string[] = [];
@@ -584,7 +595,7 @@ export async function importDevelopers(
 
     // Create auth user via admin API (requires service role key)
     const { data: authUser, error: authError } =
-      await serviceClient.auth.admin.createUser({
+      await supabase.auth.admin.createUser({
         email: row.email,
         email_confirm: true,
         user_metadata: {
@@ -691,4 +702,79 @@ export async function importDevelopers(
 
   revalidatePath("/admin/developers");
   return { success: true, imported, skipped, errors };
+}
+
+// ============================================================
+// SCORE MANAGEMENT
+// ============================================================
+
+export async function deleteScore(scoreId: string): Promise<ActionResult> {
+  const authErr = await requireAdmin();
+  if (authErr) return authErr;
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("scores").delete().eq("id", scoreId);
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/scores");
+  return { success: true };
+}
+
+export async function toggleScoreDirectoryHidden(
+  scoreId: string,
+  hidden: boolean
+): Promise<ActionResult> {
+  const authErr = await requireAdmin();
+  if (authErr) return authErr;
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("scores")
+    .update({ directory_hidden: hidden })
+    .eq("id", scoreId);
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/scores");
+  return { success: true };
+}
+
+// ============================================================
+// DELETE — DEVELOPERS & COMPANIES
+// ============================================================
+
+export async function deleteDeveloper(developerId: string): Promise<ActionResult> {
+  const authErr = await requireAdmin();
+  if (authErr) return authErr;
+  const supabase = createServiceClient();
+
+  // Get the profile_id to also remove auth user
+  const { data: dev } = await supabase
+    .from("developers")
+    .select("profile_id")
+    .eq("id", developerId)
+    .single();
+
+  // Delete the developer record
+  const { error } = await supabase
+    .from("developers")
+    .delete()
+    .eq("id", developerId);
+  if (error) return { success: false, error: error.message };
+
+  // Also remove the auth user if we have the profile_id
+  if (dev?.profile_id) {
+    await supabase.auth.admin.deleteUser(dev.profile_id);
+  }
+
+  revalidatePath("/admin/developers");
+  return { success: true };
+}
+
+export async function deleteCompany(companyId: string): Promise<ActionResult> {
+  const authErr = await requireAdmin();
+  if (authErr) return authErr;
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("companies")
+    .delete()
+    .eq("id", companyId);
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/admin/companies");
+  return { success: true };
 }

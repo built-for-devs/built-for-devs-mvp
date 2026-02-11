@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCompanyById } from "@/lib/admin/queries";
 import { PageHeader } from "@/components/admin/page-header";
 import { EditCompanyDialog } from "./edit-company-dialog";
+import { DeleteCompanyButton } from "./delete-company-button";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { CompanyNotesEditor } from "./notes-editor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -170,6 +171,24 @@ export default async function AdminCompanyDetailPage({
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Danger Zone */}
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="text-base text-destructive">Danger Zone</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Delete company</p>
+              <p className="text-xs text-muted-foreground">
+                Permanently remove this company and all associated data.
+              </p>
+            </div>
+            <DeleteCompanyButton companyId={company.id} companyName={company.name} />
+          </div>
         </CardContent>
       </Card>
     </div>

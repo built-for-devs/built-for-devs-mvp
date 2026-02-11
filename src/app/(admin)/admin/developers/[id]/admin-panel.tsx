@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   updateDeveloperAvailability,
   updateDeveloperQualityRating,
   updateDeveloperNotes,
+  deleteDeveloper,
 } from "@/lib/admin/actions";
 import { NotesEditor } from "@/components/admin/notes-editor";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -20,11 +23,13 @@ export function DeveloperAdminPanel({
 }: {
   developer: DeveloperWithProfile;
 }) {
+  const router = useRouter();
   const [available, setAvailable] = useState(developer.is_available);
   const [rating, setRating] = useState(
     developer.quality_rating?.toString() ?? ""
   );
   const [isPending, startTransition] = useTransition();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   function handleAvailabilityChange(checked: boolean) {
     setAvailable(checked);
@@ -135,6 +140,46 @@ export function DeveloperAdminPanel({
           </dl>
         </CardContent>
       </Card>
+
+      {/* Danger Zone */}
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="text-base text-destructive">Danger Zone</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Delete developer</p>
+              <p className="text-xs text-muted-foreground">
+                Permanently remove this developer and their auth account.
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              Delete
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete developer"
+        description={`This will permanently delete this developer and their auth account. This action cannot be undone.`}
+        confirmLabel="Delete"
+        destructive
+        loading={isPending}
+        onConfirm={() => {
+          startTransition(async () => {
+            await deleteDeveloper(developer.id);
+            router.push("/admin/developers");
+          });
+        }}
+      />
     </div>
   );
 }

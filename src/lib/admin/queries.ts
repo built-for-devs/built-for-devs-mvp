@@ -418,7 +418,7 @@ export async function getScores(
   let query = client
     .from("scores")
     .select(
-      "id, slug, email, name, company_name, target_url, target_domain, final_score, classification, status, error_message, processing_time_ms, created_at, completed_at",
+      "id, slug, email, name, company_name, target_url, target_domain, final_score, classification, status, error_message, processing_time_ms, created_at, completed_at, directory_hidden",
       { count: "exact" }
     );
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { Plus } from "lucide-react";
+import { Plus, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getScores } from "@/lib/admin/queries";
 import { parseScoreFilters } from "@/lib/admin/search-params";
@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/admin/page-header";
 import { TextSearch } from "@/components/admin/text-search";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ScoreStatusFilter } from "./status-filter";
+import { ScoreActions } from "./score-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -152,15 +153,20 @@ export default async function AdminScoresPage({
                       {new Date(score.created_at as string).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      {score.status === "complete" && (
-                        <Link
-                          href={`/score/${score.slug as string}`}
-                          className="text-sm text-muted-foreground hover:underline"
-                          target="_blank"
-                        >
-                          View report
-                        </Link>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        {(score.directory_hidden as boolean) && (
+                          <span title="Hidden from directory">
+                            <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                          </span>
+                        )}
+                        <ScoreActions
+                          scoreId={score.id as string}
+                          slug={score.slug as string}
+                          domain={score.target_domain as string}
+                          status={score.status as string}
+                          directoryHidden={score.directory_hidden as boolean}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
