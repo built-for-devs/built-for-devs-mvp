@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload } from "lucide-react";
+import { Upload, Linkedin } from "lucide-react";
 
 export default async function AdminDevelopersPage({
   searchParams,
@@ -66,6 +66,7 @@ export default async function AdminDevelopersPage({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead className="w-10"></TableHead>
                     <TableHead>Job Title</TableHead>
                     <TableHead>Role Types</TableHead>
                     <TableHead>Seniority</TableHead>
@@ -89,6 +90,18 @@ export default async function AdminDevelopersPage({
                         <p className="text-xs text-muted-foreground">
                           {dev.profiles.email}
                         </p>
+                      </TableCell>
+                      <TableCell>
+                        {dev.linkedin_url ? (
+                          <a
+                            href={dev.linkedin_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <Linkedin className="h-4 w-4" />
+                          </a>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {dev.job_title ?? "—"}
