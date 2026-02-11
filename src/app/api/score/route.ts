@@ -39,9 +39,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
   }
 
-  // Get client IP
-  const forwarded = request.headers.get("x-forwarded-for");
-  const ip = forwarded?.split(",")[0]?.trim() ?? "0.0.0.0";
+  // Get client IP (x-real-ip is Vercel's reliable client IP header)
+  const ip =
+    request.headers.get("x-real-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "0.0.0.0";
 
   const supabase = createServiceClient();
 
