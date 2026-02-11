@@ -480,7 +480,7 @@ export function QuickBuyForm({
             {matchPreview.totalMatches >= 3 ? (
               <div className="flex items-center gap-2 text-sm font-medium text-green-700">
                 <Users className="h-4 w-4" />
-                {matchPreview.totalMatches} developer{matchPreview.totalMatches !== 1 ? "s" : ""}{" "}
+                At least {matchPreview.totalMatches} developer{matchPreview.totalMatches !== 1 ? "s" : ""}{" "}
                 match your criteria
               </div>
             ) : matchPreview.totalMatches > 0 ? (
