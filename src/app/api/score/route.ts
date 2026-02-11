@@ -99,6 +99,41 @@ export async function POST(request: NextRequest) {
     score_id: score.id,
   });
 
+  // Auto-create or link company (best-effort)
+  if (company_name) {
+    try {
+      const { data: existing } = await supabase
+        .from("companies")
+        .select("id")
+        .ilike("name", company_name)
+        .maybeSingle();
+
+      let companyId: string;
+      if (existing) {
+        companyId = existing.id;
+      } else {
+        const { data: created } = await supabase
+          .from("companies")
+          .insert({
+            name: company_name,
+            website: `https://${domain}`,
+          })
+          .select("id")
+          .single();
+        companyId = created?.id;
+      }
+
+      if (companyId) {
+        await supabase
+          .from("scores")
+          .update({ company_id: companyId })
+          .eq("id", score.id);
+      }
+    } catch (err) {
+      console.error("Failed to link company:", err);
+    }
+  }
+
   // Upsert lead (best-effort)
   try {
     const { data: existingLead } = await supabase
