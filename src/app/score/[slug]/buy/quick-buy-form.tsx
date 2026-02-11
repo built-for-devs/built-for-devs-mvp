@@ -88,7 +88,7 @@ export function QuickBuyForm({
 
   // UI state
   const [showRefinement, setShowRefinement] = useState(false);
-  const [numEvaluations, setNumEvaluations] = useState(3);
+  const [numEvaluations, setNumEvaluations] = useState(10);
   const [matchPreview, setMatchPreview] = useState<MatchPreviewResult | null>(null);
   const [matchLoading, setMatchLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
