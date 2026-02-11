@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getScores } from "@/lib/admin/queries";
 import { parseScoreFilters } from "@/lib/admin/search-params";
@@ -8,6 +9,7 @@ import { TextSearch } from "@/components/admin/text-search";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { ScoreStatusFilter } from "./status-filter";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -55,7 +57,14 @@ export default async function AdminScoresPage({
       <PageHeader
         title="Scores"
         description={`${count} score${count !== 1 ? "s" : ""} submitted`}
-      />
+      >
+        <Button asChild size="sm">
+          <Link href="/admin/scores/new">
+            <Plus className="mr-1.5 h-4 w-4" />
+            Submit Score
+          </Link>
+        </Button>
+      </PageHeader>
 
       <div className="mb-4 flex gap-4">
         <div className="flex-1">
