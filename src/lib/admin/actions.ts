@@ -2,11 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { sendEmail, getAppUrl } from "@/lib/email";
 import { InvitationEmail } from "@/lib/email/templates/invitation";
 import { PaymentSentEmail } from "@/lib/email/templates/payment-sent";
 import { CompanyReportReadyEmail } from "@/lib/email/templates/company-report-ready";
 import type { Enums } from "@/types/database";
+
+function createServiceClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!
+  );
+}
 
 type ActionResult = { success: boolean; error?: string };
 
@@ -556,6 +564,7 @@ export async function importDevelopers(
   importSource: string
 ): Promise<{ success: boolean; imported: number; skipped: number; errors: string[] }> {
   const supabase = await createClient();
+  const serviceClient = createServiceClient();
   let imported = 0;
   let skipped = 0;
   const errors: string[] = [];
@@ -573,9 +582,9 @@ export async function importDevelopers(
       continue;
     }
 
-    // Create auth user via admin API (this triggers the handle_new_user trigger)
+    // Create auth user via admin API (requires service role key)
     const { data: authUser, error: authError } =
-      await supabase.auth.admin.createUser({
+      await serviceClient.auth.admin.createUser({
         email: row.email,
         email_confirm: true,
         user_metadata: {
