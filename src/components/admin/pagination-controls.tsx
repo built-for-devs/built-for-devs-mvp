@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import {
   Pagination,
   PaginationContent,
@@ -19,7 +19,6 @@ export function PaginationControls({
   totalItems,
   perPage = 25,
 }: PaginationControlsProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentPage = parseInt(searchParams.get("page") ?? "1", 10);
@@ -27,10 +26,10 @@ export function PaginationControls({
 
   if (totalPages <= 1) return null;
 
-  function goToPage(page: number) {
+  function buildHref(page: number) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", String(page));
-    router.push(`${pathname}?${params.toString()}`);
+    return `${pathname}?${params.toString()}`;
   }
 
   // Show at most 5 page numbers centered around current
@@ -51,18 +50,17 @@ export function PaginationControls({
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious
-              onClick={() => goToPage(Math.max(1, currentPage - 1))}
+              href={buildHref(Math.max(1, currentPage - 1))}
               className={
-                currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"
+                currentPage <= 1 ? "pointer-events-none opacity-50" : ""
               }
             />
           </PaginationItem>
           {pages.map((page) => (
             <PaginationItem key={page}>
               <PaginationLink
-                onClick={() => goToPage(page)}
+                href={buildHref(page)}
                 isActive={page === currentPage}
-                className="cursor-pointer"
               >
                 {page}
               </PaginationLink>
@@ -70,11 +68,11 @@ export function PaginationControls({
           ))}
           <PaginationItem>
             <PaginationNext
-              onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
+              href={buildHref(Math.min(totalPages, currentPage + 1))}
               className={
                 currentPage >= totalPages
                   ? "pointer-events-none opacity-50"
-                  : "cursor-pointer"
+                  : ""
               }
             />
           </PaginationItem>
