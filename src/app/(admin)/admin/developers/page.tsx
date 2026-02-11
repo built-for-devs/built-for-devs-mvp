@@ -65,7 +65,7 @@ export default async function AdminDevelopersPage({
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead className="w-10"></TableHead>
-                    <TableHead className="max-w-[120px]">Job Title</TableHead>
+                    <TableHead className="max-w-[180px]">Job Title</TableHead>
                     <TableHead>Company</TableHead>
                     <TableHead>Role Types</TableHead>
                     <TableHead>Seniority</TableHead>

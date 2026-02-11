@@ -107,7 +107,7 @@ export function DeveloperRowEditor({ dev }: { dev: DeveloperRowData }) {
       </TableCell>
 
       {/* Job Title */}
-      <TableCell className="max-w-[120px] truncate text-sm text-muted-foreground" title={dev.job_title ?? undefined}>
+      <TableCell className="max-w-[180px] truncate text-sm text-muted-foreground" title={dev.job_title ?? undefined}>
         {dev.job_title ?? "—"}
       </TableCell>
 
