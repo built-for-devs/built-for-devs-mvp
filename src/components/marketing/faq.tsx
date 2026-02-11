@@ -45,7 +45,7 @@ export function FAQ() {
     <section className="px-6 py-20">
       <div className="mx-auto max-w-3xl">
         <h2 className="text-center text-3xl font-bold text-brand-dark">
-          Questions
+          Frequently Asked Questions
         </h2>
         <Accordion type="single" collapsible className="mt-10">
           {faqs.map((faq, i) => (

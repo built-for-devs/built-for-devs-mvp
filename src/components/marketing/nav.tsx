@@ -26,13 +26,13 @@ export function Nav() {
               href="/score"
               className="text-sm text-brand-gray hover:text-brand-dark"
             >
-              Score Tool
+              Get Your Score
             </Link>
             <Link
               href="/directory"
               className="text-sm text-brand-gray hover:text-brand-dark"
             >
-              Directory
+              Product Directory
             </Link>
           </div>
         </div>
