@@ -18,6 +18,7 @@ export interface DirectoryProduct {
   company_name: string | null;
   completed_at: string;
   created_at: string;
+  previous_score: number | null;
 }
 
 export interface DirectoryFilters {
@@ -39,7 +40,7 @@ export async function getDirectoryProducts(
   let query = supabase
     .from("directory_products")
     .select(
-      "id, slug, target_url, target_domain, final_score, classification, full_evaluation, company_name, completed_at",
+      "id, slug, target_url, target_domain, final_score, classification, full_evaluation, company_name, completed_at, previous_score",
       { count: "exact" }
     );
 

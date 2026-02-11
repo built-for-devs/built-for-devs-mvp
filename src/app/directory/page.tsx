@@ -60,6 +60,9 @@ export default async function DirectoryPage({
             Browse how developer products score across 12 categories of
             developer experience.
           </p>
+          <Button asChild size="lg" className="mt-2">
+            <Link href="/score">Get Your Score</Link>
+          </Button>
         </div>
 
         <div className="mt-12 flex gap-4">

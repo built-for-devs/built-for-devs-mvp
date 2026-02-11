@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import Link from "next/link";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,22 +26,20 @@ export function DirectoryGrid({ products }: Props) {
         const productName =
           (evaluation?.product_name as string) ?? product.target_domain;
         const classification = product.classification as Classification;
+        const delta =
+          product.previous_score != null
+            ? product.final_score - product.previous_score
+            : null;
 
         return (
-          <a
-            key={product.id}
-            href={product.target_url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <Link key={product.id} href={`/score/${product.slug}`}>
             <Card className="h-full transition-colors hover:bg-muted/50">
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{productName}</p>
-                    <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       {product.target_domain}
-                      <ExternalLink className="h-3 w-3" />
                     </p>
                     {product.company_name && (
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -53,6 +52,26 @@ export function DirectoryGrid({ products }: Props) {
                       {product.final_score}
                     </span>
                     <span className="text-sm text-muted-foreground">/120</span>
+                    {delta !== null && (
+                      <div
+                        className={`mt-1 flex items-center justify-end gap-0.5 text-xs font-medium ${
+                          delta > 0
+                            ? "text-green-600"
+                            : delta < 0
+                              ? "text-red-500"
+                              : "text-muted-foreground"
+                        }`}
+                      >
+                        {delta > 0 ? (
+                          <TrendingUp className="h-3 w-3" />
+                        ) : delta < 0 ? (
+                          <TrendingDown className="h-3 w-3" />
+                        ) : (
+                          <Minus className="h-3 w-3" />
+                        )}
+                        {delta > 0 ? `+${delta}` : delta === 0 ? "0" : delta}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="mt-3">
@@ -68,7 +87,7 @@ export function DirectoryGrid({ products }: Props) {
                 </div>
               </CardContent>
             </Card>
-          </a>
+          </Link>
         );
       })}
     </div>
