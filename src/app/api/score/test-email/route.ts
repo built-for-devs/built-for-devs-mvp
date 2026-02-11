@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
           },
         ],
         reportUrl: `${getAppUrl()}/score/test123`,
+        baseUrl: getAppUrl(),
       }),
       type: "score_complete",
     });

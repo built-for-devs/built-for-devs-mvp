@@ -59,6 +59,7 @@ export async function GET(
           verdict: evaluation.summary.one_line_verdict,
           quickWins: evaluation.quick_wins.slice(0, 3),
           reportUrl: `${getAppUrl()}/score/${data.slug}`,
+          baseUrl: getAppUrl(),
         }),
         type: "score_complete",
         replyTo: "tessa@builtfor.dev",

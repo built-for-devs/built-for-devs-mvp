@@ -253,7 +253,7 @@ export function ScoreReport({ evaluation, previousScore, scoreHistory = [], doma
                   recorded product evaluations.
                 </p>
                 <Button asChild className="mt-4">
-                  <Link href={slug ? `/score/${slug}/buy` : "https://builtfor.dev"}>
+                  <Link href={slug ? `/score/${slug}/buy` : "/"}>
                     Get Real Developer Feedback
                   </Link>
                 </Button>

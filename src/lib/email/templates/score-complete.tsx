@@ -18,6 +18,7 @@ interface ScoreCompleteEmailProps {
   verdict: string;
   quickWins: Array<{ recommendation: string; impact: string; effort: string }>;
   reportUrl: string;
+  baseUrl: string;
 }
 
 const CLASSIFICATION_LABELS: Record<Classification, string> = {
@@ -36,6 +37,7 @@ export function ScoreCompleteEmail({
   verdict,
   quickWins,
   reportUrl,
+  baseUrl,
 }: ScoreCompleteEmailProps) {
   return (
     <Html>
@@ -76,7 +78,7 @@ export function ScoreCompleteEmail({
             full developer experience.
           </Text>
           <Section style={btnContainer}>
-            <Button style={secondaryButton} href="https://builtfor.dev">
+            <Button style={secondaryButton} href={`${baseUrl}`}>
               Learn About Built for Devs Evaluations
             </Button>
           </Section>
