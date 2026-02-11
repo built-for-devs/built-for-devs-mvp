@@ -58,6 +58,27 @@ export default async function ScoreReportPage({ params }: PageProps) {
 
   const evaluation = score.full_evaluation as ScoreEvaluation;
 
+  // Fetch score history for this domain (excluding current score)
+  const { data: historyRows } = await supabase
+    .from("scores")
+    .select("slug, final_score, classification, created_at, target_url")
+    .eq("target_domain", score.target_domain)
+    .eq("status", "complete")
+    .neq("slug", slug)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  const scoreHistory = (historyRows ?? []).map((row: Record<string, unknown>) => ({
+    slug: row.slug as string,
+    finalScore: row.final_score as number,
+    classification: row.classification as string,
+    createdAt: row.created_at as string,
+    targetUrl: row.target_url as string,
+  }));
+
+  // Find the most recent previous score for delta calculation
+  const previousScore = scoreHistory.length > 0 ? scoreHistory[0].finalScore : null;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
@@ -70,7 +91,12 @@ export default async function ScoreReportPage({ params }: PageProps) {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-12">
-        <ScoreReport evaluation={evaluation} />
+        <ScoreReport
+          evaluation={evaluation}
+          previousScore={previousScore}
+          scoreHistory={scoreHistory}
+          domain={score.target_domain}
+        />
       </main>
     </div>
   );

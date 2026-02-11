@@ -14,8 +14,19 @@ import type {
 } from "@/lib/score/types";
 import { CATEGORY_META } from "@/lib/score/types";
 
+interface ScoreHistoryEntry {
+  slug: string;
+  finalScore: number;
+  classification: string;
+  createdAt: string;
+  targetUrl: string;
+}
+
 interface Props {
   evaluation: ScoreEvaluation;
+  previousScore?: number | null;
+  scoreHistory?: ScoreHistoryEntry[];
+  domain?: string;
 }
 
 const classificationStyles: Record<Classification, string> = {
@@ -41,7 +52,9 @@ function getScoreColor(score: number): string {
   return "bg-red-500";
 }
 
-export function ScoreReport({ evaluation }: Props) {
+export function ScoreReport({ evaluation, previousScore, scoreHistory = [], domain }: Props) {
+  const delta = previousScore != null ? evaluation.summary.final_score - previousScore : null;
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -68,6 +81,19 @@ export function ScoreReport({ evaluation }: Props) {
             <p className="mt-1 text-sm font-medium">
               {classificationLabels[evaluation.summary.classification]}
             </p>
+            {delta !== null && (
+              <p
+                className={`mt-1 text-sm font-medium ${
+                  delta > 0
+                    ? "text-emerald-600"
+                    : delta < 0
+                      ? "text-red-600"
+                      : "text-muted-foreground"
+                }`}
+              >
+                {delta > 0 ? `+${delta}` : delta === 0 ? "No change" : delta} from previous
+              </p>
+            )}
           </div>
         </div>
         <p className="text-lg text-muted-foreground">
@@ -244,6 +270,76 @@ export function ScoreReport({ evaluation }: Props) {
                 </Button>
               </CardContent>
             </Card>
+          </div>
+        </>
+      )}
+
+      {/* Score History */}
+      {scoreHistory.length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">
+              Score History for {domain}
+            </h2>
+            <div className="space-y-2">
+              {scoreHistory.map((entry) => {
+                const entryDelta =
+                  evaluation.summary.final_score - entry.finalScore;
+                return (
+                  <Link
+                    key={entry.slug}
+                    href={`/score/${entry.slug}`}
+                    className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">
+                        {new Date(entry.createdAt).toLocaleDateString(
+                          undefined,
+                          {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          }
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {entry.targetUrl}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge
+                        variant="outline"
+                        className={`border-transparent ${
+                          classificationStyles[
+                            entry.classification as Classification
+                          ] ?? ""
+                        }`}
+                      >
+                        {classificationLabels[
+                          entry.classification as Classification
+                        ] ?? entry.classification}
+                      </Badge>
+                      <span className="text-sm font-semibold tabular-nums">
+                        {entry.finalScore}/120
+                      </span>
+                      {entryDelta !== 0 && (
+                        <span
+                          className={`text-xs font-medium ${
+                            entryDelta > 0
+                              ? "text-emerald-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {entryDelta > 0 ? "+" : ""}
+                          {entryDelta}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </>
       )}
