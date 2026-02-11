@@ -41,7 +41,7 @@ export function Nav() {
             href="/score"
             className="rounded-lg bg-brand-green px-4 py-2 text-sm font-medium text-brand-dark transition-colors hover:bg-brand-green/80"
           >
-            Get Your Score
+            Get Started
           </Link>
         </div>
       </div>

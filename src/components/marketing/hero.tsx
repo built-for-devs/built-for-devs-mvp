@@ -20,7 +20,7 @@ export function Hero() {
             href="/score"
             className="rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-brand-dark transition-colors hover:bg-brand-green/80"
           >
-            Get Your Score
+            Get Started
           </Link>
           <a
             href="#how-it-works"
