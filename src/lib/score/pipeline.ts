@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { crawlTarget } from "./crawl";
 import { evaluateCrawlData } from "./evaluate";
-import type { ScoreEvaluation } from "./types";
 
 function getServiceClient() {
   return createClient(
@@ -56,7 +55,7 @@ export async function runScorePipeline(scoreId: string): Promise<void> {
       .update({ status: "evaluating", crawl_data: crawlResult })
       .eq("id", scoreId);
 
-    const evaluation: ScoreEvaluation = await evaluateCrawlData(
+    const { evaluation, inputTokens, outputTokens } = await evaluateCrawlData(
       score.target_url,
       crawlResult
     );
@@ -80,6 +79,8 @@ export async function runScorePipeline(scoreId: string): Promise<void> {
         full_evaluation: evaluation,
         processing_time_ms: processingTimeMs,
         completed_at: new Date().toISOString(),
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
       })
       .eq("id", scoreId);
   } catch (err) {

@@ -10,10 +10,16 @@ function getClient(): Anthropic {
   return _client;
 }
 
+export interface EvaluationResult {
+  evaluation: ScoreEvaluation;
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export async function evaluateCrawlData(
   targetUrl: string,
   crawlResult: CrawlResult
-): Promise<ScoreEvaluation> {
+): Promise<EvaluationResult> {
   const client = getClient();
   const userMessage = buildUserMessage(targetUrl, crawlResult);
 
@@ -43,5 +49,9 @@ export async function evaluateCrawlData(
     throw new Error("Claude response missing required fields");
   }
 
-  return evaluation;
+  return {
+    evaluation,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+  };
 }

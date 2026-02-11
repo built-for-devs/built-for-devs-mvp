@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Users, Building2, FolderKanban, ClipboardCheck, DollarSign } from "lucide-react";
+import { Users, Building2, FolderKanban, ClipboardCheck, DollarSign, Gauge } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   getDashboardStats,
+  getScoreStats,
   getNeedsAttentionProjects,
   getNeedsReviewEvaluations,
   getNeedsPaymentEvaluations,
@@ -21,8 +22,9 @@ import {
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient();
-  const [stats, needsAssignment, needsReview, needsPayment] = await Promise.all([
+  const [stats, scoreStats, needsAssignment, needsReview, needsPayment] = await Promise.all([
     getDashboardStats(supabase),
+    getScoreStats(supabase),
     getNeedsAttentionProjects(supabase),
     getNeedsReviewEvaluations(supabase),
     getNeedsPaymentEvaluations(supabase),
@@ -33,7 +35,7 @@ export default async function AdminDashboardPage() {
       <PageHeader title="Dashboard" />
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard
           label="Developers"
           value={stats.totalDevelopers}
@@ -59,6 +61,12 @@ export default async function AdminDashboardPage() {
           label="Needs Payment"
           value={stats.evaluationsNeedingPayment}
           icon={DollarSign}
+        />
+        <StatCard
+          label="Score Tool"
+          value={`$${scoreStats.totalCost.toFixed(2)}`}
+          description={`${scoreStats.totalScores} scores completed`}
+          icon={Gauge}
         />
       </div>
 

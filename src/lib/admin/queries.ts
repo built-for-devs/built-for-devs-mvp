@@ -54,6 +54,41 @@ export async function getDashboardStats(supabase: Client): Promise<DashboardStat
   };
 }
 
+// Sonnet pricing: $3/1M input, $15/1M output
+const SONNET_INPUT_COST_PER_TOKEN = 3 / 1_000_000;
+const SONNET_OUTPUT_COST_PER_TOKEN = 15 / 1_000_000;
+
+export async function getScoreStats(supabase: Client) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = supabase as any;
+
+  const [completedResult, tokenResult] = await Promise.all([
+    client
+      .from("scores")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "complete"),
+    client
+      .from("scores")
+      .select("input_tokens, output_tokens")
+      .eq("status", "complete")
+      .not("input_tokens", "is", null),
+  ]);
+
+  const totalScores = completedResult.count ?? 0;
+  const rows = (tokenResult.data ?? []) as { input_tokens: number; output_tokens: number }[];
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  for (const row of rows) {
+    totalInputTokens += row.input_tokens ?? 0;
+    totalOutputTokens += row.output_tokens ?? 0;
+  }
+  const totalCost =
+    totalInputTokens * SONNET_INPUT_COST_PER_TOKEN +
+    totalOutputTokens * SONNET_OUTPUT_COST_PER_TOKEN;
+
+  return { totalScores, totalInputTokens, totalOutputTokens, totalCost };
+}
+
 export async function getNeedsAttentionProjects(supabase: Client) {
   const { data } = await supabase
     .from("projects")
