@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/admin/page-header";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { DeveloperAdminPanel } from "./admin-panel";
 import { EditDeveloperDialog } from "./edit-developer-dialog";
+import { ProjectPickerDialog } from "@/components/admin/project-picker-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -35,8 +36,10 @@ export default async function AdminDeveloperDetailPage({
 
   // Evaluation stats
   const statusCounts: Record<string, number> = {};
+  const existingProjectIds: string[] = [];
   for (const ev of evaluations) {
     statusCounts[ev.status] = (statusCounts[ev.status] ?? 0) + 1;
+    existingProjectIds.push(ev.project_id);
   }
 
   return (
@@ -45,7 +48,10 @@ export default async function AdminDeveloperDetailPage({
         title={dev.profiles.full_name}
         description={dev.profiles.email}
       >
-        <EditDeveloperDialog developer={dev} />
+        <div className="flex gap-2">
+          <ProjectPickerDialog developerId={dev.id} existingProjectIds={existingProjectIds} />
+          <EditDeveloperDialog developer={dev} />
+        </div>
       </PageHeader>
 
       <Tabs defaultValue="profile">
