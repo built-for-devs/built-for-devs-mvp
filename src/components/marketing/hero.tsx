@@ -10,7 +10,10 @@ export function Hero() {
             before they even try your product.
           </span>
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-brand-gray md:text-xl">
+        <p className="mt-6 text-xl font-semibold text-brand-dark md:text-2xl">
+          We show you what pushed them away.
+        </p>
+        <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-brand-gray md:text-xl">
           Most developers who drop off never come back, and never tell you
           why. We show you exactly where they hesitate, get confused, or quit,
           so you can remove the friction and turn drop-offs into adoption.
