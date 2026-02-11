@@ -6,6 +6,6 @@ export async function POST(request: NextRequest) {
   await supabase.auth.signOut();
 
   const url = request.nextUrl.clone();
-  url.pathname = "/login";
-  return NextResponse.redirect(url);
+  url.pathname = "/";
+  return NextResponse.redirect(url, 303);
 }
