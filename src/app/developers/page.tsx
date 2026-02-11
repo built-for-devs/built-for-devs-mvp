@@ -5,13 +5,13 @@ import { Footer } from "@/components/marketing/footer";
 import { Monitor, UserCheck, DollarSign, Clock, Zap, Shield } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Try Developer Tools & Get Paid | Built for Devs",
+  title: "Get Paid to Try Developer Tools | Built for Devs",
   description:
-    "Join our network of developers who get paid to try developer tools. Screen-record your experience, share honest feedback, and earn money for each completed evaluation.",
+    "Get paid to try developer tools and share your honest opinion. Screen-record your first experience, stay fully anonymous, and earn money for each completed evaluation.",
   openGraph: {
-    title: "Try Developer Tools & Get Paid | Built for Devs",
+    title: "Get Paid to Try Developer Tools | Built for Devs",
     description:
-      "Join our network of developers who get paid to try developer tools. Screen-record your experience, share honest feedback, and earn money for each completed evaluation.",
+      "Get paid to try developer tools and share your honest opinion. Screen-record your first experience, stay fully anonymous, and earn money for each completed evaluation.",
     type: "website",
   },
 };
@@ -39,7 +39,7 @@ const steps = [
     number: "4",
     title: "Get paid",
     description:
-      "Once your evaluation is reviewed and approved, you receive payment via PayPal. Simple as that.",
+      "Once your recording is approved, you get paid within 5 to 7 business days.",
   },
 ];
 
