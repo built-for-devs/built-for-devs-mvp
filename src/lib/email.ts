@@ -28,6 +28,7 @@ interface SendEmailOptions {
   subject: string;
   react: ReactElement;
   type: string;
+  replyTo?: string;
   recipientProfileId?: string;
   evaluationId?: string;
   projectId?: string;
@@ -38,6 +39,7 @@ export async function sendEmail({
   subject,
   react,
   type,
+  replyTo,
   recipientProfileId,
   evaluationId,
   projectId,
@@ -48,6 +50,7 @@ export async function sendEmail({
       to,
       subject,
       react,
+      ...(replyTo && { replyTo }),
     });
 
     const supabase = getServiceClient();

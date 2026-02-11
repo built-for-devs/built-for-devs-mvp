@@ -61,6 +61,7 @@ export async function GET(
           reportUrl: `${getAppUrl()}/score/${data.slug}`,
         }),
         type: "score_complete",
+        replyTo: "tessa@builtfor.dev",
       });
       console.log(`[score-status] ${slug}: sendEmail completed successfully`);
     } catch (emailErr) {

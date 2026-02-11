@@ -13,8 +13,12 @@ import type {
   ScoreCategories,
 } from "@/lib/score/types";
 import { CATEGORY_META } from "@/lib/score/types";
+import {
+  classificationStyles,
+  classificationLabels,
+} from "@/lib/score/classification";
 
-interface ScoreHistoryEntry {
+export interface ScoreHistoryEntry {
   slug: string;
   finalScore: number;
   classification: string;
@@ -28,22 +32,6 @@ interface Props {
   scoreHistory?: ScoreHistoryEntry[];
   domain?: string;
 }
-
-const classificationStyles: Record<Classification, string> = {
-  exceptional: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  excellent: "bg-green-100 text-green-800 border-green-200",
-  good: "bg-blue-100 text-blue-800 border-blue-200",
-  needs_work: "bg-amber-100 text-amber-800 border-amber-200",
-  poor: "bg-red-100 text-red-800 border-red-200",
-};
-
-const classificationLabels: Record<Classification, string> = {
-  exceptional: "Exceptional",
-  excellent: "Excellent",
-  good: "Good",
-  needs_work: "Needs Work",
-  poor: "Poor",
-};
 
 function getScoreColor(score: number): string {
   if (score >= 8) return "bg-emerald-500";
@@ -347,12 +335,20 @@ export function ScoreReport({ evaluation, previousScore, scoreHistory = [], doma
       {/* Footer */}
       <Separator />
       <div className="flex items-center justify-between">
-        <Link
-          href="/score"
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          Score another product
-        </Link>
+        <div className="flex gap-4">
+          <Link
+            href="/score"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Score another product
+          </Link>
+          <Link
+            href="/directory"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            Browse all products
+          </Link>
+        </div>
         <span className="text-xs text-muted-foreground">
           Powered by Built for Devs
         </span>

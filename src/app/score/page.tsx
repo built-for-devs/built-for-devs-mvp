@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ScoreForm } from "./score-form";
 import { CATEGORY_META } from "@/lib/score/types";
 
@@ -59,6 +60,14 @@ export default function ScorePage() {
         <p className="mt-12 text-center text-sm text-muted-foreground">
           Built on a scoring framework shaped by years of hands-on developer
           experience research and 100+ real product evaluations.
+        </p>
+        <p className="mt-4 text-center text-sm">
+          <Link
+            href="/directory"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Browse the product directory
+          </Link>
         </p>
       </main>
     </div>
