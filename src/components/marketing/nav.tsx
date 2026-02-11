@@ -17,16 +17,16 @@ export function Nav() {
               Get Your Score
             </Link>
             <Link
-              href="/directory"
-              className="text-sm text-brand-gray hover:text-brand-dark"
-            >
-              Product Directory
-            </Link>
-            <Link
               href="/developers"
               className="text-sm text-brand-gray hover:text-brand-dark"
             >
               Evaluate Products
+            </Link>
+            <Link
+              href="/directory"
+              className="text-sm text-brand-gray hover:text-brand-dark"
+            >
+              Product Directory
             </Link>
             <Link
               href="/blog"

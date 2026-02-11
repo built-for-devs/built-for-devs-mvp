@@ -13,16 +13,16 @@ export function Footer() {
         </div>
         <div className="flex gap-6">
           <Link
-            href="/blog"
-            className="text-sm text-brand-gray hover:text-brand-dark"
-          >
-            Blog
-          </Link>
-          <Link
             href="/score"
             className="text-sm text-brand-gray hover:text-brand-dark"
           >
             Get Your Score
+          </Link>
+          <Link
+            href="/developers"
+            className="text-sm text-brand-gray hover:text-brand-dark"
+          >
+            Evaluate Products
           </Link>
           <Link
             href="/directory"
@@ -31,10 +31,10 @@ export function Footer() {
             Product Directory
           </Link>
           <Link
-            href="/developers"
+            href="/blog"
             className="text-sm text-brand-gray hover:text-brand-dark"
           >
-            Evaluate Products
+            Blog
           </Link>
           <Link
             href="/login"
