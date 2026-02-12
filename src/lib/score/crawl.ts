@@ -119,15 +119,22 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
     }
   }
 
-  // Fallback: try common paths on same origin
-  for (const path of DISCOVERY_PATHS) {
-    const pageUrl = `${origin}${path}`;
-    if (!candidateUrls.has(pageUrl) && pageUrl !== targetUrl) {
-      candidateUrls.set(pageUrl, capitalize(path.slice(1).replace(/[-_]/g, " ")));
+  // Only try fallback paths if we didn't find enough real links from the homepage.
+  // When the homepage already links to docs, blindly probing /docs, /api, /sdk etc.
+  // wastes crawl credits and often hits soft-404 pages.
+  const hasEnoughDiscoveredLinks = discoveredUrls.length >= 2;
+
+  if (!hasEnoughDiscoveredLinks) {
+    // Fallback: try common paths on same origin
+    for (const path of DISCOVERY_PATHS) {
+      const pageUrl = `${origin}${path}`;
+      if (!candidateUrls.has(pageUrl) && pageUrl !== targetUrl) {
+        candidateUrls.set(pageUrl, capitalize(path.slice(1).replace(/[-_]/g, " ")));
+      }
     }
   }
 
-  // Fallback: try common doc subdomains
+  // Always try doc subdomains — they're high-value and only 3 requests max
   if (rootDomain) {
     for (const sub of DOC_SUBDOMAINS) {
       const subUrl = `https://${sub}.${rootDomain}`;
@@ -138,10 +145,15 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
   }
 
   // 4. Crawl candidates in parallel batches (up to 5 at a time)
-  // Prioritize discovered links (actual links from the site) and doc-related paths
-  // over generic fallback paths like /pricing
   const candidates = Array.from(candidateUrls.entries());
   const batchSize = 5;
+
+  // Track content fingerprints to detect soft 404s (sites that return the same
+  // shell page for every unknown path). Use the first 500 chars as a fingerprint.
+  const seenFingerprints = new Set<string>();
+  if (homepage.status === "success") {
+    seenFingerprints.add(homepage.content.slice(0, 500));
+  }
 
   for (let i = 0; i < candidates.length; i += batchSize) {
     if (totalChars >= MAX_CONTENT_LENGTH) break;
@@ -153,7 +165,6 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
 
     for (const page of results) {
       if (totalChars >= MAX_CONTENT_LENGTH) {
-        // Still record the page as skipped so we know we tried
         if (page.status === "success") {
           page.status = "skipped";
           page.content = "";
@@ -164,6 +175,18 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
       }
 
       if (page.status === "success") {
+        // Detect soft 404s: if this page's content fingerprint matches a
+        // previously seen page, it's likely the same shell/redirect page
+        const fingerprint = page.content.slice(0, 500);
+        if (seenFingerprints.has(fingerprint)) {
+          page.status = "skipped";
+          page.content = "";
+          page.error = "Duplicate content (likely soft 404)";
+          pages.push(page);
+          continue;
+        }
+        seenFingerprints.add(fingerprint);
+
         const remaining = MAX_CONTENT_LENGTH - totalChars;
         if (page.content.length > remaining) {
           page.content =
