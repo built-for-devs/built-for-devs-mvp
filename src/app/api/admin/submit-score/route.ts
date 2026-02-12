@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { url, email, name, company_name } = parsed.data;
+  const { url, email, name, company_name, admin_note } = parsed.data;
 
   let domain: string;
   try {
@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
       email,
       name: name || null,
       company_name: company_name || null,
+      admin_note: admin_note || null,
       target_url: url,
       target_domain: domain,
       ip_address: "0.0.0.0",

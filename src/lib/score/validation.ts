@@ -31,6 +31,7 @@ export const scoreSubmitSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   name: z.string().optional(),
   company_name: z.string().optional(),
+  admin_note: z.string().max(1000).optional(),
 });
 
 export type ScoreSubmitInput = z.infer<typeof scoreSubmitSchema>;

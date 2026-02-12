@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { scoreSubmitSchema } from "@/lib/score/validation";
@@ -14,6 +15,7 @@ export function AdminScoreForm() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [adminNote, setAdminNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +29,7 @@ export function AdminScoreForm() {
       email,
       name: name || undefined,
       company_name: companyName || undefined,
+      admin_note: adminNote || undefined,
     });
 
     if (!parsed.success) {
@@ -113,6 +116,20 @@ export function AdminScoreForm() {
                 onChange={(e) => setCompanyName(e.target.value)}
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="adminNote">Personal Note (included in email)</Label>
+            <Textarea
+              id="adminNote"
+              placeholder="Hey! I ran a Developer Adoption Score on your site and thought you'd find the results interesting..."
+              value={adminNote}
+              onChange={(e) => setAdminNote(e.target.value)}
+              rows={3}
+              maxLength={1000}
+            />
+            <p className="text-xs text-muted-foreground">
+              Optional. This note will appear in the score email sent to the recipient.
+            </p>
           </div>
         </CardContent>
         <div className="px-6 pb-6">

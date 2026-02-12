@@ -20,7 +20,7 @@ export async function GET(
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("scores")
-    .select("status, error_message, email, name, slug, email_sent, full_evaluation")
+    .select("status, error_message, email, name, slug, email_sent, full_evaluation, admin_note")
     .eq("slug", slug)
     .single();
 
@@ -60,6 +60,7 @@ export async function GET(
           quickWins: evaluation.quick_wins.slice(0, 3),
           reportUrl: `${getAppUrl()}/score/${data.slug}`,
           baseUrl: getAppUrl(),
+          personalNote: (data.admin_note as string) || undefined,
         }),
         type: "score_complete",
         replyTo: "tessa@builtfor.dev",

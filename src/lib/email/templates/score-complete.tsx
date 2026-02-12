@@ -19,6 +19,7 @@ interface ScoreCompleteEmailProps {
   quickWins: Array<{ recommendation: string; impact: string; effort: string }>;
   reportUrl: string;
   baseUrl: string;
+  personalNote?: string;
 }
 
 const CLASSIFICATION_LABELS: Record<Classification, string> = {
@@ -38,6 +39,7 @@ export function ScoreCompleteEmail({
   quickWins,
   reportUrl,
   baseUrl,
+  personalNote,
 }: ScoreCompleteEmailProps) {
   return (
     <Html>
@@ -46,6 +48,14 @@ export function ScoreCompleteEmail({
         <Container style={container}>
           <Text style={heading}>Your Developer Adoption Score is Ready</Text>
           <Text style={paragraph}>Hi {recipientName},</Text>
+
+          {personalNote && (
+            <Section style={noteSection}>
+              <Text style={noteText}>{personalNote}</Text>
+              <Text style={noteSignoff}>— Tessa</Text>
+            </Section>
+          )}
+
           <Text style={paragraph}>
             <strong>{productName}</strong> scored{" "}
             <strong>{finalScore}/120</strong> (
@@ -128,6 +138,24 @@ const secondaryButton = {
   backgroundColor: "#ffffff",
   color: "#18181b",
   border: "1px solid #18181b",
+};
+const noteSection = {
+  borderLeft: "3px solid #18181b",
+  paddingLeft: "16px",
+  margin: "16px 0 24px 0",
+};
+const noteText = {
+  fontSize: "16px",
+  lineHeight: "26px",
+  color: "#333",
+  fontStyle: "italic" as const,
+  margin: "0",
+};
+const noteSignoff = {
+  fontSize: "16px",
+  lineHeight: "26px",
+  color: "#333",
+  marginTop: "8px",
 };
 const hr = { borderColor: "#e6ebf1", margin: "32px 0" };
 const footer = { color: "#8898aa", fontSize: "12px" };
