@@ -85,7 +85,7 @@ Apply the following deductions ONLY when the specific condition is clearly evide
 - **No documentation visible** (-10): No docs link found anywhere on the site
 - **No free tier or trial** (-8): Only "contact sales" or paid-only access
 - **No code examples on homepage** (-5): Marketing-heavy homepage with zero code
-- **Broken or outdated docs** (-5): References to deprecated versions, dead links mentioned in content
+- **Broken or outdated docs** (-5): References to deprecated versions, dead links that are actually visible on the site's own pages (NOT paths our crawler tried speculatively)
 - **No API reference** (-5): Developer tool with no API documentation
 - **Generic enterprise marketing** (-5): "Digital transformation," "synergy," "leverage" language targeting non-technical buyers
 - **Gated content requiring sales call** (-3): Technical content hidden behind "book a demo"
@@ -150,16 +150,12 @@ export function buildUserMessage(
 ): string {
   let message = `Evaluate the developer-facing product at ${targetUrl}.\n\n`;
 
-  // Summarize crawl results so the model knows what succeeded
+  // Summarize crawl results — only mention successfully crawled pages.
   const successful = crawlResult.pages.filter((p) => p.status === "success");
-  const failed = crawlResult.pages.filter((p) => p.status === "failed" || p.status === "skipped");
 
   message += `## Crawl Summary\n`;
   message += `- Successfully crawled ${successful.length} page(s): ${successful.map((p) => p.label).join(", ")}\n`;
-  if (failed.length > 0) {
-    message += `- Could not reach ${failed.length} page(s): ${failed.map((p) => `${p.label} (${p.error})`).join(", ")}\n`;
-  }
-  message += `\nIMPORTANT: Some pages may not have been reachable by our automated crawler but could still exist. If the crawled homepage content contains links or references to documentation, API references, or other resources, acknowledge their existence even if we could not crawl the page directly. Only flag "No documentation visible" if there are genuinely no docs links anywhere in the crawled content.\n\n`;
+  message += `\nNote: We crawled the homepage and followed links found on it. The pages listed below are what we could successfully retrieve. Score based on this content plus any documentation/resources that are clearly linked from the crawled pages.\n\n`;
 
   // Show discovered documentation links (crawled or not)
   const docLinks = crawlResult.discoveredDocLinks ?? [];

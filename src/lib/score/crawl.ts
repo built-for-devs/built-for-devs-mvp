@@ -6,25 +6,8 @@ const MAX_CONTENT_LENGTH = 80000;
 const MAX_HOMEPAGE_LENGTH = 15000;
 const CRAWL_TIMEOUT_MS = 20000;
 
-// Common documentation paths to try on the same origin
-const DISCOVERY_PATHS = [
-  "/docs",
-  "/documentation",
-  "/developers",
-  "/developer",
-  "/api",
-  "/api-reference",
-  "/reference",
-  "/guides",
-  "/getting-started",
-  "/quickstart",
-  "/tutorials",
-  "/pricing",
-  "/sdk",
-];
-
-// Common subdomains where docs live
-const DOC_SUBDOMAINS = ["docs", "developer", "developers"];
+// Max pages to crawl beyond the homepage. Keeps credit usage to ~7 calls.
+const MAX_CANDIDATES = 6;
 
 // Known third-party documentation platforms — URLs on these hosts
 // should be crawled even if they don't share the product's domain
@@ -47,7 +30,7 @@ const KNOWN_DOC_PLATFORMS = [
   "vercel.app",
 ];
 
-// Patterns that indicate a URL is documentation-related
+// Patterns that indicate a URL is documentation-related (high priority)
 const DOC_URL_PATTERNS = [
   /\/docs\b/i,
   /\/documentation\b/i,
@@ -64,6 +47,15 @@ const DOC_URL_PATTERNS = [
   /developer\./i,
 ];
 
+// Non-doc pages that are still useful for scoring (pricing, changelog, etc.)
+const SCORING_URL_PATTERNS = [
+  /\/pricing/i,
+  /\/integrations/i,
+  /\/changelog/i,
+  /\/releases/i,
+  /\/community/i,
+];
+
 export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
   const pages: CrawledPage[] = [];
   let totalChars = 0;
@@ -72,16 +64,20 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
   const origin = parsedUrl.origin;
   const rootDomain = getRootDomain(parsedUrl.hostname);
 
-  // 1. Crawl the submitted URL (required)
+  // 1. Crawl the homepage (always required)
   const homepage = await crawlPage(targetUrl, "Homepage");
 
-  // 2. Extract doc-related URLs from full homepage content BEFORE truncation
-  const discoveredUrls = homepage.status === "success"
-    ? extractDocUrls(homepage.content, origin, rootDomain)
-    : [];
+  // 2. Extract ALL links from full homepage content BEFORE truncation.
+  //    We ONLY crawl pages that are actually linked — no speculative guessing.
+  const allLinks =
+    homepage.status === "success"
+      ? extractSiteLinks(homepage.content, origin, rootDomain)
+      : [];
 
-  // Track all discovered doc links for the prompt (even if we can't crawl them)
-  const allDiscoveredDocLinks = [...discoveredUrls];
+  // Track doc links for the prompt (even ones we don't end up crawling)
+  const allDiscoveredDocLinks = allLinks
+    .filter((l) => l.isDoc)
+    .map(({ url, label }) => ({ url, label }));
 
   // Truncate homepage to preserve content budget for doc pages
   if (homepage.status === "success") {
@@ -94,62 +90,74 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
   }
   pages.push(homepage);
 
-  // 3. Build candidate URLs: doc root pages first, then discovered links, then fallbacks
+  // 3. Build candidate URLs from discovered links only — no guessing
   const candidateUrls = new Map<string, string>(); // url -> label
 
-  // Derive doc root paths from discovered links and add them first (highest priority)
-  // e.g., if we found /docs/api/auth, also try /docs as a root landing page
-  for (const { url: docUrl } of discoveredUrls) {
+  const docLinks = allLinks.filter((l) => l.isDoc);
+  const scoringLinks = allLinks.filter(
+    (l) => !l.isDoc && SCORING_URL_PATTERNS.some((p) => p.test(l.url))
+  );
+
+  // a) Derive doc root pages from deep doc links (highest priority)
+  //    e.g., if we found docs.example.com/api/auth, also try docs.example.com
+  for (const { url: docUrl } of docLinks) {
     try {
       const parsed = new URL(docUrl);
       const pathParts = parsed.pathname.split("/").filter(Boolean);
       if (pathParts.length > 1) {
         const rootPath = `${parsed.origin}/${pathParts[0]}`;
         if (!candidateUrls.has(rootPath) && rootPath !== targetUrl) {
-          candidateUrls.set(rootPath, capitalize(pathParts[0].replace(/[-_]/g, " ")) + " (overview)");
+          candidateUrls.set(
+            rootPath,
+            capitalize(pathParts[0].replace(/[-_]/g, " ")) + " (overview)"
+          );
         }
       }
-    } catch { /* skip malformed */ }
+      // If doc URL is on a different origin (e.g., docs.example.com/deep/page),
+      // also try the origin root (docs.example.com)
+      if (parsed.origin !== origin && parsed.pathname !== "/") {
+        const originRoot = parsed.origin;
+        if (!candidateUrls.has(originRoot) && originRoot !== targetUrl) {
+          candidateUrls.set(originRoot, `${parsed.hostname} (root)`);
+        }
+      }
+    } catch {
+      /* skip malformed */
+    }
   }
 
-  // Then add discovered links (actual links from the site)
-  for (const { url, label } of discoveredUrls) {
-    if (!candidateUrls.has(url)) {
+  // b) Add discovered doc links
+  for (const { url, label } of docLinks) {
+    if (!candidateUrls.has(url) && url !== targetUrl) {
       candidateUrls.set(url, label);
     }
   }
 
-  // Only try fallback paths if we didn't find enough real links from the homepage.
-  // When the homepage already links to docs, blindly probing /docs, /api, /sdk etc.
-  // wastes crawl credits and often hits soft-404 pages.
-  const hasEnoughDiscoveredLinks = discoveredUrls.length >= 2;
-
-  if (!hasEnoughDiscoveredLinks) {
-    // Fallback: try common paths on same origin
-    for (const path of DISCOVERY_PATHS) {
-      const pageUrl = `${origin}${path}`;
-      if (!candidateUrls.has(pageUrl) && pageUrl !== targetUrl) {
-        candidateUrls.set(pageUrl, capitalize(path.slice(1).replace(/[-_]/g, " ")));
-      }
+  // c) Add scoring-relevant non-doc pages (pricing, changelog, etc.)
+  for (const { url, label } of scoringLinks) {
+    if (!candidateUrls.has(url) && url !== targetUrl) {
+      candidateUrls.set(url, label);
     }
   }
 
-  // Always try doc subdomains — they're high-value and only 3 requests max
-  if (rootDomain) {
-    for (const sub of DOC_SUBDOMAINS) {
-      const subUrl = `https://${sub}.${rootDomain}`;
-      if (!candidateUrls.has(subUrl) && subUrl !== targetUrl) {
-        candidateUrls.set(subUrl, `${capitalize(sub)} subdomain`);
-      }
+  // d) If NO doc links were found on the homepage at all, try docs.domain.com
+  //    as a single fallback — many products host docs on a subdomain that
+  //    isn't explicitly linked from the main site navigation.
+  if (docLinks.length === 0 && rootDomain) {
+    const docsSubUrl = `https://docs.${rootDomain}`;
+    if (!candidateUrls.has(docsSubUrl) && docsSubUrl !== targetUrl) {
+      candidateUrls.set(docsSubUrl, "Docs subdomain");
     }
   }
 
-  // 4. Crawl candidates in parallel batches (up to 5 at a time)
-  const candidates = Array.from(candidateUrls.entries());
+  // 4. Crawl candidates (capped, in parallel batches of 5)
+  const candidates = Array.from(candidateUrls.entries()).slice(
+    0,
+    MAX_CANDIDATES
+  );
   const batchSize = 5;
 
-  // Track content fingerprints to detect soft 404s (sites that return the same
-  // shell page for every unknown path). Use the first 500 chars as a fingerprint.
+  // Track content fingerprints to detect soft 404s
   const seenFingerprints = new Set<string>();
   if (homepage.status === "success") {
     seenFingerprints.add(homepage.content.slice(0, 500));
@@ -175,8 +183,6 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
       }
 
       if (page.status === "success") {
-        // Detect soft 404s: if this page's content fingerprint matches a
-        // previously seen page, it's likely the same shell/redirect page
         const fingerprint = page.content.slice(0, 500);
         if (seenFingerprints.has(fingerprint)) {
           page.status = "skipped";
@@ -202,10 +208,13 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
   // Also extract doc links from all successfully crawled pages (not just homepage)
   for (const page of pages) {
     if (page.status === "success" && page.url !== targetUrl) {
-      const extraLinks = extractDocUrls(page.content, origin, rootDomain);
+      const extraLinks = extractSiteLinks(page.content, origin, rootDomain);
       for (const link of extraLinks) {
-        if (!allDiscoveredDocLinks.some((d) => d.url === link.url)) {
-          allDiscoveredDocLinks.push(link);
+        if (
+          link.isDoc &&
+          !allDiscoveredDocLinks.some((d) => d.url === link.url)
+        ) {
+          allDiscoveredDocLinks.push({ url: link.url, label: link.label });
         }
       }
     }
@@ -218,9 +227,96 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Link extraction — finds ALL links in crawled content (absolute + relative)
+// ---------------------------------------------------------------------------
+
+interface SiteLink {
+  url: string;
+  label: string;
+  isDoc: boolean;
+}
+
 /**
- * Check if a URL's hostname matches a known third-party doc platform.
+ * Extract all same-domain and doc-platform links from crawled markdown content.
+ * Handles absolute URLs, relative URLs, markdown links, and bare href attributes.
  */
+function extractSiteLinks(
+  content: string,
+  origin: string,
+  rootDomain: string | null
+): SiteLink[] {
+  const found: SiteLink[] = [];
+  const seen = new Set<string>();
+
+  function tryAdd(rawUrl: string, rawLabel: string) {
+    let url = rawUrl.trim();
+
+    // Resolve relative URLs against the page origin
+    if (url.startsWith("/")) {
+      url = `${origin}${url}`;
+    }
+
+    // Skip non-http URLs (mailto:, tel:, #anchors, javascript:, etc.)
+    if (!url.startsWith("http")) return;
+
+    // Normalize: remove fragment, trailing slash
+    try {
+      const parsed = new URL(url);
+      parsed.hash = "";
+      url = parsed.toString().replace(/\/$/, "");
+    } catch {
+      return;
+    }
+
+    if (seen.has(url)) return;
+
+    // Only keep same-domain links or known doc platforms
+    const isSameDomain = rootDomain != null && url.includes(rootDomain);
+    const isDocPlatform = isKnownDocPlatform(url);
+    if (!isSameDomain && !isDocPlatform) return;
+
+    seen.add(url);
+
+    const isDoc =
+      DOC_URL_PATTERNS.some((p) => p.test(url)) || isDocPlatform;
+    const label = rawLabel.slice(0, 50).trim() || labelFromUrl(url);
+    found.push({ url, label, isDoc });
+  }
+
+  // 1. Markdown links: [label](url) — most common in Tabstack/Jina output
+  const mdLinkRegex = /\[([^\]]*)\]\(([^)]+)\)/g;
+  let match;
+  while ((match = mdLinkRegex.exec(content)) !== null) {
+    tryAdd(match[2], match[1]);
+  }
+
+  // 2. Bare href attributes: href="url" (sometimes preserved by extractors)
+  const hrefRegex = /href=["']([^"']+)["']/g;
+  while ((match = hrefRegex.exec(content)) !== null) {
+    tryAdd(match[1], "");
+  }
+
+  // 3. Plain URLs that match doc patterns (catch URLs in text without markup)
+  const plainUrlRegex = /https?:\/\/[^\s)<>"']+/g;
+  while ((match = plainUrlRegex.exec(content)) !== null) {
+    const url = match[0];
+    // Only add plain URLs if they look doc-related (avoid noise from every link)
+    if (
+      DOC_URL_PATTERNS.some((p) => p.test(url)) ||
+      isKnownDocPlatform(url)
+    ) {
+      tryAdd(url, "");
+    }
+  }
+
+  return found;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function isKnownDocPlatform(url: string): boolean {
   try {
     const hostname = new URL(url).hostname;
@@ -232,89 +328,9 @@ function isKnownDocPlatform(url: string): boolean {
   }
 }
 
-/**
- * Determine if a URL should be treated as a documentation link.
- * Accepts URLs that are: (doc-pattern AND same-domain) OR on a known doc platform.
- */
-function isRelevantDocUrl(
-  url: string,
-  rootDomain: string | null
-): boolean {
-  const isDocUrl = DOC_URL_PATTERNS.some((pattern) => pattern.test(url));
-  const isSameDomain = rootDomain != null && url.includes(rootDomain);
-
-  // Same-domain doc URL
-  if (isDocUrl && isSameDomain) return true;
-
-  // Third-party doc platform (e.g., acme.readme.io, acme.gitbook.io)
-  if (isKnownDocPlatform(url)) return true;
-
-  return false;
-}
-
-/**
- * Extract URLs from crawled content that look like documentation pages.
- * Crawled content is markdown with [text](url) links.
- */
-function extractDocUrls(
-  content: string,
-  origin: string,
-  rootDomain: string | null
-): { url: string; label: string }[] {
-  const found: { url: string; label: string }[] = [];
-  const seen = new Set<string>();
-
-  // Match markdown-style links: [label](url)
-  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
-  let match;
-
-  while ((match = linkRegex.exec(content)) !== null) {
-    const label = match[1];
-    const url = match[2];
-
-    if (seen.has(url)) continue;
-
-    if (isRelevantDocUrl(url, rootDomain)) {
-      seen.add(url);
-      found.push({ url, label: label.slice(0, 50) });
-    }
-  }
-
-  // Match bare href="url" patterns (Jina sometimes preserves these)
-  const hrefRegex = /href=["'](https?:\/\/[^"']+)["']/g;
-  while ((match = hrefRegex.exec(content)) !== null) {
-    const url = match[1];
-    if (seen.has(url)) continue;
-
-    if (isRelevantDocUrl(url, rootDomain)) {
-      seen.add(url);
-      found.push({ url, label: labelFromUrl(url) });
-    }
-  }
-
-  // Also look for plain URLs that match doc patterns
-  const plainUrlRegex = /https?:\/\/[^\s)<>"']+/g;
-  while ((match = plainUrlRegex.exec(content)) !== null) {
-    const url = match[0];
-    if (seen.has(url)) continue;
-
-    if (isRelevantDocUrl(url, rootDomain)) {
-      seen.add(url);
-      found.push({ url, label: labelFromUrl(url) });
-    }
-  }
-
-  // Limit to 12 discovered URLs
-  return found.slice(0, 12);
-}
-
-/**
- * Generate a human-readable label from a URL path.
- */
 function labelFromUrl(url: string): string {
   try {
     const parsed = new URL(url);
-    // For third-party platforms, include the platform name
     if (isKnownDocPlatform(url)) {
       const platformName = KNOWN_DOC_PLATFORMS.find(
         (p) => parsed.hostname === p || parsed.hostname.endsWith(`.${p}`)
@@ -325,15 +341,14 @@ function labelFromUrl(url: string): string {
         : `Docs (${platformName})`;
     }
     const path = parsed.pathname;
-    return capitalize(path.slice(1).split("/")[0].replace(/[-_]/g, " ")) || "Docs";
+    return (
+      capitalize(path.slice(1).split("/")[0].replace(/[-_]/g, " ")) || "Docs"
+    );
   } catch {
     return "Docs";
   }
 }
 
-/**
- * Extract root domain from hostname (e.g., "www.stripe.com" → "stripe.com")
- */
 function getRootDomain(hostname: string): string | null {
   const parts = hostname.split(".");
   if (parts.length < 2) return null;
@@ -343,11 +358,9 @@ function getRootDomain(hostname: string): string | null {
 async function crawlPage(url: string, label: string): Promise<CrawledPage> {
   const tabstackKey = process.env.TABSTACK_API_KEY;
 
-  // Try Tabstack first if API key is available
   if (tabstackKey) {
     const result = await crawlWithTabstack(url, label, tabstackKey);
     if (result.status === "success") return result;
-    // Fall through to Jina on failure
   }
 
   return crawlWithJina(url, label);
@@ -375,20 +388,33 @@ async function crawlWithTabstack(
     clearTimeout(timeout);
 
     if (!response.ok) {
-      return { url, label, content: "", status: "failed", error: `Tabstack HTTP ${response.status}` };
+      return {
+        url,
+        label,
+        content: "",
+        status: "failed",
+        error: `Tabstack HTTP ${response.status}`,
+      };
     }
 
     const data = await response.json();
-    const content = typeof data.markdown === "string"
-      ? data.markdown
-      : typeof data.content === "string"
-        ? data.content
-        : typeof data === "string"
-          ? data
-          : JSON.stringify(data);
+    const content =
+      typeof data.markdown === "string"
+        ? data.markdown
+        : typeof data.content === "string"
+          ? data.content
+          : typeof data === "string"
+            ? data
+            : JSON.stringify(data);
 
     if (content.length < 100) {
-      return { url, label, content: "", status: "skipped", error: "Content too short (likely 404)" };
+      return {
+        url,
+        label,
+        content: "",
+        status: "skipped",
+        error: "Content too short (likely 404)",
+      };
     }
 
     return { url, label, content, status: "success" };
@@ -403,7 +429,10 @@ async function crawlWithTabstack(
   }
 }
 
-async function crawlWithJina(url: string, label: string): Promise<CrawledPage> {
+async function crawlWithJina(
+  url: string,
+  label: string
+): Promise<CrawledPage> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), CRAWL_TIMEOUT_MS);
@@ -416,13 +445,25 @@ async function crawlWithJina(url: string, label: string): Promise<CrawledPage> {
     clearTimeout(timeout);
 
     if (!response.ok) {
-      return { url, label, content: "", status: "failed", error: `HTTP ${response.status}` };
+      return {
+        url,
+        label,
+        content: "",
+        status: "failed",
+        error: `HTTP ${response.status}`,
+      };
     }
 
     const content = await response.text();
 
     if (content.length < 100) {
-      return { url, label, content: "", status: "skipped", error: "Content too short (likely 404)" };
+      return {
+        url,
+        label,
+        content: "",
+        status: "skipped",
+        error: "Content too short (likely 404)",
+      };
     }
 
     return { url, label, content, status: "success" };
