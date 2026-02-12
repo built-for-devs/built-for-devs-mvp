@@ -48,7 +48,7 @@ const faqs: { question: string; answer: ReactNode }[] = [
   {
     question: "How many evaluations do I need?",
     answer:
-      "You choose how many you want. Even one evaluation surfaces friction you'd never catch on your own. Most clients see clear patterns emerge around 4-5 developers.",
+      "We require a minimum of 3 evaluations per project so we can identify real patterns, not just one person's opinion. Most clients see strong, actionable patterns around 5 evaluations, and 10 is the sweet spot for comprehensive insights.",
   },
   {
     question: "Is this usability testing?",
