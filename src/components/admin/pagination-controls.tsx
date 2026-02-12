@@ -1,14 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams, usePathname } from "next/navigation";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
 
 interface PaginationControlsProps {
   totalItems: number;
@@ -46,38 +42,54 @@ export function PaginationControls({
         Showing {Math.min((currentPage - 1) * perPage + 1, totalItems)}&ndash;
         {Math.min(currentPage * perPage, totalItems)} of {totalItems}
       </p>
-      <Pagination>
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious
+      <nav role="navigation" aria-label="pagination" className="mx-auto flex w-full justify-center">
+        <ul className="flex flex-row items-center gap-1">
+          <li>
+            <Link
               href={buildHref(Math.max(1, currentPage - 1))}
-              className={
-                currentPage <= 1 ? "pointer-events-none opacity-50" : ""
-              }
-            />
-          </PaginationItem>
+              aria-label="Go to previous page"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "default" }),
+                "gap-1 px-2.5 sm:pl-2.5",
+                currentPage <= 1 && "pointer-events-none opacity-50"
+              )}
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+              <span className="hidden sm:block">Previous</span>
+            </Link>
+          </li>
           {pages.map((page) => (
-            <PaginationItem key={page}>
-              <PaginationLink
+            <li key={page}>
+              <Link
                 href={buildHref(page)}
-                isActive={page === currentPage}
+                aria-current={page === currentPage ? "page" : undefined}
+                className={cn(
+                  buttonVariants({
+                    variant: page === currentPage ? "outline" : "ghost",
+                    size: "icon",
+                  })
+                )}
               >
                 {page}
-              </PaginationLink>
-            </PaginationItem>
+              </Link>
+            </li>
           ))}
-          <PaginationItem>
-            <PaginationNext
+          <li>
+            <Link
               href={buildHref(Math.min(totalPages, currentPage + 1))}
-              className={
-                currentPage >= totalPages
-                  ? "pointer-events-none opacity-50"
-                  : ""
-              }
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
+              aria-label="Go to next page"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "default" }),
+                "gap-1 px-2.5 sm:pr-2.5",
+                currentPage >= totalPages && "pointer-events-none opacity-50"
+              )}
+            >
+              <span className="hidden sm:block">Next</span>
+              <ChevronRightIcon className="h-4 w-4" />
+            </Link>
+          </li>
+        </ul>
+      </nav>
     </div>
   );
 }

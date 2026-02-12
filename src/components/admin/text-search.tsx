@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -16,9 +16,16 @@ export function TextSearch({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [value, setValue] = useState(searchParams.get("search") ?? "");
+  const isInitialMount = useRef(true);
 
-  // Debounce search param updates
+  // Debounce search param updates — only when the user types (value changes),
+  // not when other search params change (e.g. pagination)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     const timeout = setTimeout(() => {
       const params = new URLSearchParams(searchParams.toString());
       if (value) {
@@ -31,7 +38,8 @@ export function TextSearch({
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [value, pathname, router, searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   return (
     <div className="relative">
