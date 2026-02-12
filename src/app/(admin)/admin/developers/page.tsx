@@ -8,15 +8,8 @@ import { DeveloperFilterPanel } from "@/components/admin/developer-filter-panel"
 import { TextSearch } from "@/components/admin/text-search";
 import { PaginationControls } from "@/components/admin/pagination-controls";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Upload } from "lucide-react";
-import { DeveloperRowEditor } from "./developer-row-editor";
+import { DeveloperTable } from "./developer-table";
 
 export default async function AdminDevelopersPage({
   searchParams,
@@ -59,29 +52,7 @@ export default async function AdminDevelopersPage({
           </div>
         ) : (
           <>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="w-10"></TableHead>
-                    <TableHead className="max-w-[180px]">Job Title</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Role Types</TableHead>
-                    <TableHead>Seniority</TableHead>
-                    <TableHead>Exp</TableHead>
-                    <TableHead>Languages</TableHead>
-                    <TableHead>Available</TableHead>
-                    <TableHead className="text-right">Evals</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {developers.map((dev) => (
-                    <DeveloperRowEditor key={dev.id} dev={dev} />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <DeveloperTable developers={developers} />
             <Suspense>
               <PaginationControls totalItems={count} />
             </Suspense>

@@ -100,6 +100,7 @@ export type Database = {
             | Database["public"]["Enums"]["buying_influence_level"]
             | null
           cicd_tools: string[] | null
+          city: string | null
           cloud_platforms: string[] | null
           company_size: Database["public"]["Enums"]["company_size"] | null
           country: string | null
@@ -148,6 +149,7 @@ export type Database = {
             | Database["public"]["Enums"]["buying_influence_level"]
             | null
           cicd_tools?: string[] | null
+          city?: string | null
           cloud_platforms?: string[] | null
           company_size?: Database["public"]["Enums"]["company_size"] | null
           country?: string | null
@@ -196,6 +198,7 @@ export type Database = {
             | Database["public"]["Enums"]["buying_influence_level"]
             | null
           cicd_tools?: string[] | null
+          city?: string | null
           cloud_platforms?: string[] | null
           company_size?: Database["public"]["Enums"]["company_size"] | null
           country?: string | null

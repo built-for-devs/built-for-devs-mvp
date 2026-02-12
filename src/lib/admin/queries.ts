@@ -141,12 +141,35 @@ export async function getDevelopersWithProfiles(
     .select("*, profiles!inner(full_name, email, avatar_url)", { count: "exact" })
     .neq("profiles.role", "admin");
 
-  // Text search across profile name, company, job title
+  // Text search across profile name/email and developer fields.
+  // PostgREST .or() can't span joined tables, so we first find matching
+  // profile IDs, then OR those with developer-table column matches.
   if (filters.search) {
     const s = `%${filters.search}%`;
-    query = query.or(
-      `job_title.ilike.${s},current_company.ilike.${s},profiles.full_name.ilike.${s}`
-    );
+
+    // Find profiles matching by name or email
+    const { data: matchingProfiles } = await supabase
+      .from("profiles")
+      .select("id")
+      .or(`full_name.ilike.${s},email.ilike.${s}`);
+
+    const profileIds = (matchingProfiles ?? []).map((p) => p.id);
+
+    if (profileIds.length > 0) {
+      // Match developers by their own fields OR by matching profile
+      query = query.or(
+        `job_title.ilike.${s},current_company.ilike.${s},profile_id.in.(${profileIds.join(",")})`
+      );
+    } else {
+      // No profile matches — just search developer fields
+      query = query.or(`job_title.ilike.${s},current_company.ilike.${s}`);
+    }
+  }
+
+  // Location filter — search across country, state_region, and city
+  if (filters.location) {
+    const loc = `%${filters.location}%`;
+    query = query.or(`country.ilike.${loc},state_region.ilike.${loc},city.ilike.${loc}`);
   }
 
   // Boolean filter

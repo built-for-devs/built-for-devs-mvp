@@ -78,20 +78,7 @@ export async function updateDeveloperQualityRating(
 
 export async function updateDeveloperProfile(
   developerId: string,
-  data: {
-    job_title?: string;
-    current_company?: string;
-    country?: string;
-    state_region?: string;
-    timezone?: string;
-    years_experience?: number;
-    linkedin_url?: string;
-    github_url?: string;
-    paypal_email?: string;
-    role_types?: string[];
-    seniority?: string;
-    languages?: string[];
-  }
+  data: Record<string, unknown>
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase
@@ -317,7 +304,7 @@ export async function assignDeveloperToProject(
   try {
     const { data: devProfile } = await supabase
       .from("developers")
-      .select("profiles(email, full_name)")
+      .select("imported, profiles(email, full_name)")
       .eq("id", developerId)
       .single();
 
@@ -328,16 +315,23 @@ export async function assignDeveloperToProject(
       .single();
 
     const profile = devProfile?.profiles as unknown as { email: string; full_name: string } | null;
+    const isImported = !!devProfile?.imported;
+
     if (profile?.email && project) {
+      const subject = isImported
+        ? `Tessa from Built for Devs — paid evaluation opportunity`
+        : `You're invited to evaluate ${project.product_name}`;
+
       await sendEmail({
         to: profile.email,
-        subject: `You're invited to evaluate ${project.product_name}`,
+        subject,
         react: InvitationEmail({
           developerName: profile.full_name || "Developer",
           productName: project.product_name,
-          payoutAmount: payoutAmount ?? 175,
+          payoutAmount: payoutAmount ?? 129,
           evaluationUrl: `${getAppUrl()}/dev/evaluations/${evaluation.id}`,
           expiresIn: "24 hours",
+          isImported,
         }),
         type: "invitation",
         recipientProfileId: undefined,
@@ -708,6 +702,104 @@ export async function importDevelopers(
 }
 
 // ============================================================
+// FOLK CRM IMPORT
+// ============================================================
+
+export interface FolkImportContact {
+  email: string;
+  full_name: string;
+  job_title?: string;
+  current_company?: string;
+  linkedin_url?: string;
+  location?: string;
+  seniority?: string;
+  years_experience?: number;
+  languages?: string[];
+  role_types?: string[];
+}
+
+export async function importFromFolk(
+  contacts: FolkImportContact[]
+): Promise<{ success: boolean; imported: number; skipped: number; errors: string[] }> {
+  const authErr = await requireAdmin();
+  if (authErr) return { success: false, imported: 0, skipped: 0, errors: [authErr.error ?? "Unauthorized"] };
+
+  const supabase = createServiceClient();
+  let imported = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const contact of contacts) {
+    // Check for duplicate email
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", contact.email)
+      .maybeSingle();
+
+    if (existing) {
+      skipped++;
+      continue;
+    }
+
+    // Create auth user via admin API
+    const { data: authUser, error: authError } =
+      await supabase.auth.admin.createUser({
+        email: contact.email,
+        email_confirm: true,
+        user_metadata: {
+          full_name: contact.full_name,
+          role: "developer",
+        },
+      });
+
+    if (authError) {
+      errors.push(`${contact.email}: ${authError.message}`);
+      continue;
+    }
+
+    if (!authUser.user) {
+      errors.push(`${contact.email}: Failed to create user`);
+      continue;
+    }
+
+    // Build developer fields from enrichment data
+    const devFields: Record<string, unknown> = {
+      imported: true,
+      import_source: "folk",
+    };
+
+    if (contact.job_title) devFields.job_title = contact.job_title;
+    if (contact.current_company) devFields.current_company = contact.current_company;
+    if (contact.linkedin_url) devFields.linkedin_url = contact.linkedin_url;
+    if (contact.location) devFields.country = contact.location;
+    if (contact.seniority) devFields.seniority = contact.seniority;
+    if (contact.years_experience) devFields.years_experience = contact.years_experience;
+    if (contact.languages?.length) devFields.languages = contact.languages;
+    if (contact.role_types?.length) devFields.role_types = contact.role_types;
+
+    // Update the developer record (created by trigger)
+    const { data: devRecord } = await supabase
+      .from("developers")
+      .select("id")
+      .eq("profile_id", authUser.user.id)
+      .single();
+
+    if (devRecord) {
+      await supabase
+        .from("developers")
+        .update(devFields)
+        .eq("id", devRecord.id);
+    }
+
+    imported++;
+  }
+
+  revalidatePath("/admin/developers");
+  return { success: true, imported, skipped, errors };
+}
+
+// ============================================================
 // SCORE MANAGEMENT
 // ============================================================
 
@@ -767,6 +859,43 @@ export async function deleteDeveloper(developerId: string): Promise<ActionResult
 
   revalidatePath("/admin/developers");
   return { success: true };
+}
+
+export async function deleteDevelopersInBulk(
+  developerIds: string[]
+): Promise<{ success: boolean; deleted: number; errors: string[] }> {
+  const authErr = await requireAdmin();
+  if (authErr) return { success: false, deleted: 0, errors: [authErr.error ?? "Unauthorized"] };
+
+  const supabase = createServiceClient();
+  let deleted = 0;
+  const errors: string[] = [];
+
+  for (const id of developerIds) {
+    const { data: dev } = await supabase
+      .from("developers")
+      .select("profile_id, profiles(full_name)")
+      .eq("id", id)
+      .single();
+
+    const { error } = await supabase
+      .from("developers")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      errors.push(`${id}: ${error.message}`);
+      continue;
+    }
+
+    if (dev?.profile_id) {
+      await supabase.auth.admin.deleteUser(dev.profile_id);
+    }
+    deleted++;
+  }
+
+  revalidatePath("/admin/developers");
+  return { success: true, deleted, errors };
 }
 
 export async function deleteCompany(companyId: string): Promise<ActionResult> {

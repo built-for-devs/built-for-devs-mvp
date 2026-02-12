@@ -12,6 +12,7 @@ import {
 } from "@/lib/admin/filter-options";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -50,7 +51,15 @@ interface DeveloperRowData {
   profiles: { full_name: string; email: string };
 }
 
-export function DeveloperRowEditor({ dev }: { dev: DeveloperRowData }) {
+export function DeveloperRowEditor({
+  dev,
+  selected,
+  onToggleSelect,
+}: {
+  dev: DeveloperRowData;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -81,6 +90,11 @@ export function DeveloperRowEditor({ dev }: { dev: DeveloperRowData }) {
 
   return (
     <TableRow key={dev.id}>
+      {onToggleSelect !== undefined && (
+        <TableCell>
+          <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
+        </TableCell>
+      )}
       {/* Name */}
       <TableCell>
         <Link

@@ -33,6 +33,7 @@ export type EvaluationWithRelations = Evaluation & {
 // Filter parameter types
 export type DeveloperFilters = {
   search?: string;
+  location?: string;
   role_types?: string[];
   seniority?: string[];
   min_experience?: number;

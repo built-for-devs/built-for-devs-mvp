@@ -33,6 +33,7 @@ export function parseDeveloperFilters(
 
   return {
     search: get("search") ?? undefined,
+    location: get("location") ?? undefined,
     role_types: parseArray(get("role_types")),
     seniority: parseArray(get("seniority")),
     min_experience: parseIntParam(get("min_experience")),

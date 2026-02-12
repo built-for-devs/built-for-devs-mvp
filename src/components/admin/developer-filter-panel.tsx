@@ -92,6 +92,20 @@ export function DeveloperFilterPanel() {
         />
       </div>
 
+      {/* Location filter */}
+      <div className="flex items-center gap-1 rounded-md border px-3 py-1.5">
+        <Label className="text-xs whitespace-nowrap">Location:</Label>
+        <Input
+          type="text"
+          placeholder="City, state, or country"
+          value={filters.location ?? ""}
+          onChange={(e) =>
+            updateParam("location", e.target.value || undefined)
+          }
+          className="h-6 w-40 text-xs"
+        />
+      </div>
+
       {/* Multi-select filters */}
       <MultiSelectFilter
         label="Role Types"
