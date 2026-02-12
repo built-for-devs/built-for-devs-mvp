@@ -88,6 +88,7 @@ export interface CrawledPage {
 export interface CrawlResult {
   pages: CrawledPage[];
   totalTokensEstimate: number;
+  discoveredDocLinks?: { url: string; label: string }[];
 }
 
 // --- Score status ---

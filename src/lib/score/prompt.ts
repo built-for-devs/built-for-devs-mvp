@@ -105,11 +105,12 @@ After computing: final_score = base_score + total_deductions (deductions are neg
 1. Start from zero trust. Developers are skeptical by default.
 2. Score based ONLY on what is present in the provided crawled content. Do not assume features exist if they are not shown.
 3. Be specific in evidence arrays. Quote or reference actual content from the crawled pages.
-4. If a page was not crawled or not found (e.g., documentation URL returned an error), score that category based on whether links to it are visible in navigation or content, but note the limitation.
-5. Apply all matching red flag deductions. Multiple deductions can stack.
-6. The "what_ai_cant_tell_you" array must contain 3-5 product-specific observations that ONLY hands-on developer testing would reveal. Be specific to THIS product — not generic.
-7. Quick wins should be actionable changes that could improve the score with low-to-medium effort.
-8. Return ONLY valid JSON. No markdown fences, no preamble, no explanation outside the JSON structure.`;
+4. If a page was not crawled or not found (e.g., documentation URL returned an error), score that category based on whether links to it are visible in navigation or content, but note the limitation. Common third-party documentation platforms (GitBook, ReadMe, Mintlify, Notion, Stoplight, Redocly, etc.) are legitimate documentation hosts. If links to these platforms are found in the crawled content, treat them as real documentation even if the pages couldn't be crawled directly.
+5. When scoring Documentation Quality (category 6) and Technical Depth (category 7), weight the existence and organization of doc links heavily. A product that links to well-structured documentation on a recognized platform should not be penalized just because the crawler couldn't fetch those pages. Look for signals like organized navigation, multiple doc sections, API references, and quickstart guides in the link structure.
+6. Apply all matching red flag deductions. Multiple deductions can stack. For "No documentation visible", only apply this deduction if there are genuinely no documentation links anywhere in the crawled content — not even links to third-party doc platforms like ReadMe, GitBook, or Mintlify.
+7. The "what_ai_cant_tell_you" array must contain 3-5 product-specific observations that ONLY hands-on developer testing would reveal. Be specific to THIS product — not generic.
+8. Quick wins should be actionable changes that could improve the score with low-to-medium effort.
+9. Return ONLY valid JSON. No markdown fences, no preamble, no explanation outside the JSON structure.`;
 
 const JSON_SCHEMA = `{
   "product_name": "string (inferred from crawled content)",
@@ -159,6 +160,23 @@ export function buildUserMessage(
     message += `- Could not reach ${failed.length} page(s): ${failed.map((p) => `${p.label} (${p.error})`).join(", ")}\n`;
   }
   message += `\nIMPORTANT: Some pages may not have been reachable by our automated crawler but could still exist. If the crawled homepage content contains links or references to documentation, API references, or other resources, acknowledge their existence even if we could not crawl the page directly. Only flag "No documentation visible" if there are genuinely no docs links anywhere in the crawled content.\n\n`;
+
+  // Show discovered documentation links (crawled or not)
+  const docLinks = crawlResult.discoveredDocLinks ?? [];
+  if (docLinks.length > 0) {
+    const crawledUrls = new Set(
+      crawlResult.pages
+        .filter((p) => p.status === "success")
+        .map((p) => p.url)
+    );
+    message += `## Discovered Documentation Links\n`;
+    message += `The following documentation links were found on the site. Those marked [crawled] were successfully retrieved. Those marked [linked only] were discovered but could not be fetched — their existence should still be considered when scoring documentation-related categories.\n\n`;
+    for (const link of docLinks) {
+      const status = crawledUrls.has(link.url) ? "crawled" : "linked only";
+      message += `- [${status}] ${link.label}: ${link.url}\n`;
+    }
+    message += `\n`;
+  }
 
   message += `## Crawled Content\n\n`;
 

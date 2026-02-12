@@ -1,7 +1,9 @@
 import type { CrawledPage, CrawlResult } from "./types";
 
+const TABSTACK_API_URL = "https://api.tabstack.ai/v1/extract/markdown";
 const JINA_PREFIX = "https://r.jina.ai/";
-const MAX_CONTENT_LENGTH = 50000;
+const MAX_CONTENT_LENGTH = 80000;
+const MAX_HOMEPAGE_LENGTH = 15000;
 const CRAWL_TIMEOUT_MS = 20000;
 
 // Common documentation paths to try on the same origin
@@ -23,6 +25,27 @@ const DISCOVERY_PATHS = [
 
 // Common subdomains where docs live
 const DOC_SUBDOMAINS = ["docs", "developer", "developers"];
+
+// Known third-party documentation platforms — URLs on these hosts
+// should be crawled even if they don't share the product's domain
+const KNOWN_DOC_PLATFORMS = [
+  "readme.io",
+  "readme.com",
+  "gitbook.io",
+  "gitbook.com",
+  "mintlify.dev",
+  "mintlify.app",
+  "notion.site",
+  "notion.so",
+  "stoplight.io",
+  "redocly.com",
+  "swagger.io",
+  "apiary.io",
+  "postman.com",
+  "github.io",
+  "netlify.app",
+  "vercel.app",
+];
 
 // Patterns that indicate a URL is documentation-related
 const DOC_URL_PATTERNS = [
@@ -51,22 +74,49 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
 
   // 1. Crawl the submitted URL (required)
   const homepage = await crawlPage(targetUrl, "Homepage");
-  pages.push(homepage);
-  if (homepage.status === "success") {
-    totalChars += homepage.content.length;
-  }
 
-  // 2. Extract doc-related URLs from homepage content
+  // 2. Extract doc-related URLs from full homepage content BEFORE truncation
   const discoveredUrls = homepage.status === "success"
     ? extractDocUrls(homepage.content, origin, rootDomain)
     : [];
 
-  // 3. Build candidate URLs: discovered links first, then fallback paths + subdomains
+  // Track all discovered doc links for the prompt (even if we can't crawl them)
+  const allDiscoveredDocLinks = [...discoveredUrls];
+
+  // Truncate homepage to preserve content budget for doc pages
+  if (homepage.status === "success") {
+    if (homepage.content.length > MAX_HOMEPAGE_LENGTH) {
+      homepage.content =
+        homepage.content.slice(0, MAX_HOMEPAGE_LENGTH) +
+        "\n\n[Homepage content truncated to prioritize documentation pages]";
+    }
+    totalChars += homepage.content.length;
+  }
+  pages.push(homepage);
+
+  // 3. Build candidate URLs: doc root pages first, then discovered links, then fallbacks
   const candidateUrls = new Map<string, string>(); // url -> label
 
-  // Discovered links get priority (they're actual links from the site)
+  // Derive doc root paths from discovered links and add them first (highest priority)
+  // e.g., if we found /docs/api/auth, also try /docs as a root landing page
+  for (const { url: docUrl } of discoveredUrls) {
+    try {
+      const parsed = new URL(docUrl);
+      const pathParts = parsed.pathname.split("/").filter(Boolean);
+      if (pathParts.length > 1) {
+        const rootPath = `${parsed.origin}/${pathParts[0]}`;
+        if (!candidateUrls.has(rootPath) && rootPath !== targetUrl) {
+          candidateUrls.set(rootPath, capitalize(pathParts[0].replace(/[-_]/g, " ")) + " (overview)");
+        }
+      }
+    } catch { /* skip malformed */ }
+  }
+
+  // Then add discovered links (actual links from the site)
   for (const { url, label } of discoveredUrls) {
-    candidateUrls.set(url, label);
+    if (!candidateUrls.has(url)) {
+      candidateUrls.set(url, label);
+    }
   }
 
   // Fallback: try common paths on same origin
@@ -88,6 +138,8 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
   }
 
   // 4. Crawl candidates in parallel batches (up to 5 at a time)
+  // Prioritize discovered links (actual links from the site) and doc-related paths
+  // over generic fallback paths like /pricing
   const candidates = Array.from(candidateUrls.entries());
   const batchSize = 5;
 
@@ -124,15 +176,62 @@ export async function crawlTarget(targetUrl: string): Promise<CrawlResult> {
     }
   }
 
+  // Also extract doc links from all successfully crawled pages (not just homepage)
+  for (const page of pages) {
+    if (page.status === "success" && page.url !== targetUrl) {
+      const extraLinks = extractDocUrls(page.content, origin, rootDomain);
+      for (const link of extraLinks) {
+        if (!allDiscoveredDocLinks.some((d) => d.url === link.url)) {
+          allDiscoveredDocLinks.push(link);
+        }
+      }
+    }
+  }
+
   return {
     pages,
     totalTokensEstimate: Math.ceil(totalChars / 4),
+    discoveredDocLinks: allDiscoveredDocLinks,
   };
 }
 
 /**
+ * Check if a URL's hostname matches a known third-party doc platform.
+ */
+function isKnownDocPlatform(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname;
+    return KNOWN_DOC_PLATFORMS.some(
+      (platform) => hostname === platform || hostname.endsWith(`.${platform}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Determine if a URL should be treated as a documentation link.
+ * Accepts URLs that are: (doc-pattern AND same-domain) OR on a known doc platform.
+ */
+function isRelevantDocUrl(
+  url: string,
+  rootDomain: string | null
+): boolean {
+  const isDocUrl = DOC_URL_PATTERNS.some((pattern) => pattern.test(url));
+  const isSameDomain = rootDomain != null && url.includes(rootDomain);
+
+  // Same-domain doc URL
+  if (isDocUrl && isSameDomain) return true;
+
+  // Third-party doc platform (e.g., acme.readme.io, acme.gitbook.io)
+  if (isKnownDocPlatform(url)) return true;
+
+  return false;
+}
+
+/**
  * Extract URLs from crawled content that look like documentation pages.
- * Jina Reader returns markdown-style text with [text](url) links.
+ * Crawled content is markdown with [text](url) links.
  */
 function extractDocUrls(
   content: string,
@@ -150,43 +249,63 @@ function extractDocUrls(
     const label = match[1];
     const url = match[2];
 
-    // Skip if already seen or is the same as the target
     if (seen.has(url)) continue;
 
-    // Check if the URL looks documentation-related
-    const isDocUrl = DOC_URL_PATTERNS.some((pattern) => pattern.test(url));
-    const isSameDomain =
-      rootDomain && url.includes(rootDomain);
-
-    if (isDocUrl && isSameDomain) {
+    if (isRelevantDocUrl(url, rootDomain)) {
       seen.add(url);
       found.push({ url, label: label.slice(0, 50) });
     }
   }
 
+  // Match bare href="url" patterns (Jina sometimes preserves these)
+  const hrefRegex = /href=["'](https?:\/\/[^"']+)["']/g;
+  while ((match = hrefRegex.exec(content)) !== null) {
+    const url = match[1];
+    if (seen.has(url)) continue;
+
+    if (isRelevantDocUrl(url, rootDomain)) {
+      seen.add(url);
+      found.push({ url, label: labelFromUrl(url) });
+    }
+  }
+
   // Also look for plain URLs that match doc patterns
-  const plainUrlRegex = /https?:\/\/[^\s)<>"]+/g;
+  const plainUrlRegex = /https?:\/\/[^\s)<>"']+/g;
   while ((match = plainUrlRegex.exec(content)) !== null) {
     const url = match[0];
     if (seen.has(url)) continue;
 
-    const isDocUrl = DOC_URL_PATTERNS.some((pattern) => pattern.test(url));
-    const isSameDomain = rootDomain && url.includes(rootDomain);
-
-    if (isDocUrl && isSameDomain) {
+    if (isRelevantDocUrl(url, rootDomain)) {
       seen.add(url);
-      // Generate label from URL path
-      try {
-        const path = new URL(url).pathname;
-        found.push({ url, label: capitalize(path.slice(1).split("/")[0].replace(/[-_]/g, " ")) || "Docs" });
-      } catch {
-        found.push({ url, label: "Docs" });
-      }
+      found.push({ url, label: labelFromUrl(url) });
     }
   }
 
-  // Limit to 8 discovered URLs to avoid excessive crawling
-  return found.slice(0, 8);
+  // Limit to 12 discovered URLs
+  return found.slice(0, 12);
+}
+
+/**
+ * Generate a human-readable label from a URL path.
+ */
+function labelFromUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    // For third-party platforms, include the platform name
+    if (isKnownDocPlatform(url)) {
+      const platformName = KNOWN_DOC_PLATFORMS.find(
+        (p) => parsed.hostname === p || parsed.hostname.endsWith(`.${p}`)
+      );
+      const path = parsed.pathname.slice(1).split("/")[0];
+      return path
+        ? capitalize(path.replace(/[-_]/g, " "))
+        : `Docs (${platformName})`;
+    }
+    const path = parsed.pathname;
+    return capitalize(path.slice(1).split("/")[0].replace(/[-_]/g, " ")) || "Docs";
+  } catch {
+    return "Docs";
+  }
 }
 
 /**
@@ -199,6 +318,69 @@ function getRootDomain(hostname: string): string | null {
 }
 
 async function crawlPage(url: string, label: string): Promise<CrawledPage> {
+  const tabstackKey = process.env.TABSTACK_API_KEY;
+
+  // Try Tabstack first if API key is available
+  if (tabstackKey) {
+    const result = await crawlWithTabstack(url, label, tabstackKey);
+    if (result.status === "success") return result;
+    // Fall through to Jina on failure
+  }
+
+  return crawlWithJina(url, label);
+}
+
+async function crawlWithTabstack(
+  url: string,
+  label: string,
+  apiKey: string
+): Promise<CrawledPage> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CRAWL_TIMEOUT_MS);
+
+    const response = await fetch(TABSTACK_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return { url, label, content: "", status: "failed", error: `Tabstack HTTP ${response.status}` };
+    }
+
+    const data = await response.json();
+    const content = typeof data.markdown === "string"
+      ? data.markdown
+      : typeof data.content === "string"
+        ? data.content
+        : typeof data === "string"
+          ? data
+          : JSON.stringify(data);
+
+    if (content.length < 100) {
+      return { url, label, content: "", status: "skipped", error: "Content too short (likely 404)" };
+    }
+
+    return { url, label, content, status: "success" };
+  } catch (err) {
+    return {
+      url,
+      label,
+      content: "",
+      status: "failed",
+      error: `Tabstack: ${err instanceof Error ? err.message : "Unknown error"}`,
+    };
+  }
+}
+
+async function crawlWithJina(url: string, label: string): Promise<CrawledPage> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), CRAWL_TIMEOUT_MS);
