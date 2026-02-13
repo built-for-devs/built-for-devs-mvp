@@ -355,12 +355,50 @@ function getRootDomain(hostname: string): string | null {
   return parts.slice(-2).join(".");
 }
 
+/**
+ * Detect when crawled content is mostly CSS/JS framework artifacts rather than
+ * meaningful rendered page content. This catches SPA sites (Framer, Webflow, etc.)
+ * where the crawler gets raw source instead of rendered text.
+ */
+function isLowQualityContent(content: string): boolean {
+  const sample = content.slice(0, 10000);
+
+  // Count CSS declaration patterns (property: value;)
+  const cssDeclarations = (
+    sample.match(/[\w-]+\s*:\s*[^;}\n]{1,100};/g) || []
+  ).length;
+
+  // Count markdown headings (real crawled content has these)
+  const markdownHeadings = (sample.match(/^#{1,6}\s+\S/gm) || []).length;
+
+  // Count sentence-like text (20+ char sequences of words ending with punctuation)
+  const sentences = (
+    sample.match(/[A-Za-z][A-Za-z\s,]{20,}[.!?]/g) || []
+  ).length;
+
+  // CSS declarations dominate with almost no real content = framework junk
+  return cssDeclarations > 15 && markdownHeadings < 3 && sentences < 5;
+}
+
 async function crawlPage(url: string, label: string): Promise<CrawledPage> {
   const tabstackKey = process.env.TABSTACK_API_KEY;
 
   if (tabstackKey) {
-    const result = await crawlWithTabstack(url, label, tabstackKey);
-    if (result.status === "success") return result;
+    const tabstackResult = await crawlWithTabstack(url, label, tabstackKey);
+    if (
+      tabstackResult.status === "success" &&
+      !isLowQualityContent(tabstackResult.content)
+    ) {
+      return tabstackResult;
+    }
+
+    // Tabstack failed or returned low-quality (CSS/framework junk) — try Jina
+    const jinaResult = await crawlWithJina(url, label);
+    if (jinaResult.status === "success") return jinaResult;
+
+    // Jina also failed — return Tabstack result if it at least succeeded
+    if (tabstackResult.status === "success") return tabstackResult;
+    return jinaResult;
   }
 
   return crawlWithJina(url, label);

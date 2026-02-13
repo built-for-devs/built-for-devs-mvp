@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,16 @@ export function DirectorySearch() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [value, setValue] = useState(searchParams.get("search") ?? "");
+  const isInitialMount = useRef(true);
 
+  // Debounce search — only fires when user types (value changes),
+  // not when other search params change (e.g. pagination)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     const timeout = setTimeout(() => {
       const params = new URLSearchParams(searchParams.toString());
       if (value) {
@@ -24,7 +32,7 @@ export function DirectorySearch() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [value, pathname, router, searchParams]);
+  }, [value, pathname, router]);
 
   return (
     <div className="relative">
