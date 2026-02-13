@@ -141,13 +141,22 @@ export default async function AdminScoresPage({
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`border-transparent ${statusColors[score.status as string] ?? ""}`}
-                      >
-                        {(score.status as string).charAt(0).toUpperCase() +
-                          (score.status as string).slice(1)}
-                      </Badge>
+                      <div>
+                        <Badge
+                          variant="outline"
+                          className={`border-transparent ${statusColors[score.status as string] ?? ""}`}
+                        >
+                          {(score.status as string).charAt(0).toUpperCase() +
+                            (score.status as string).slice(1)}
+                        </Badge>
+                        {score.status === "failed" && (score.error_message as string | null) && (
+                          <p className="mt-1 text-xs text-red-600 dark:text-red-400 max-w-48 truncate" title={score.error_message as string}>
+                            {(score.error_message as string).includes("Overloaded")
+                              ? "Our AI agents are out to lunch. Try again later!"
+                              : (score.error_message as string)}
+                          </p>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(score.created_at as string).toLocaleDateString()}
