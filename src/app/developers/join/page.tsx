@@ -45,6 +45,8 @@ export default function DeveloperJoinPage() {
   const [confirmEmail, setConfirmEmail] = useState(false);
 
   // Step 1: About You
+  const [jobTitle, setJobTitle] = useState("");
+  const [currentCompany, setCurrentCompany] = useState("");
   const [seniority, setSeniority] = useState("");
   const [roleTypes, setRoleTypes] = useState<string[]>([]);
   const [languages, setLanguages] = useState<string[]>([]);
@@ -101,6 +103,8 @@ export default function DeveloperJoinPage() {
 
   function buildProfileData() {
     return {
+      job_title: jobTitle.trim() || null,
+      current_company: currentCompany.trim() || null,
       seniority: seniority || null,
       role_types: roleTypes.length > 0 ? roleTypes : null,
       languages: languages.length > 0 ? languages : null,
@@ -170,7 +174,7 @@ export default function DeveloperJoinPage() {
 
   if (confirmEmail) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-background">
         <Nav />
         <section className="px-6 py-20">
           <div className="mx-auto max-w-md">
@@ -201,7 +205,7 @@ export default function DeveloperJoinPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <Nav />
       <section className="px-6 py-16 md:py-20">
         <div className="mx-auto max-w-lg">
@@ -251,6 +255,27 @@ export default function DeveloperJoinPage() {
             <CardContent className="space-y-4">
               {step === 0 && (
                 <>
+                  <div className="space-y-2">
+                    <Label>Job Title</Label>
+                    <Input
+                      type="text"
+                      value={jobTitle}
+                      onChange={(e) => setJobTitle(e.target.value)}
+                      placeholder="e.g. Senior Backend Engineer"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Company</Label>
+                    <Input
+                      type="text"
+                      value={currentCompany}
+                      onChange={(e) => setCurrentCompany(e.target.value)}
+                      placeholder="e.g. Acme Inc."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      This stays private and is never shared with the companies you evaluate.
+                    </p>
+                  </div>
                   <div className="space-y-2">
                     <Label>Seniority Level</Label>
                     <div className="grid grid-cols-3 gap-3">
@@ -316,7 +341,7 @@ export default function DeveloperJoinPage() {
                       placeholder="payments@example.com"
                     />
                     <p className="text-xs text-muted-foreground">
-                      This is where we send your $129 evaluation payments.
+                      This is how we send your evaluation payments.
                     </p>
                   </div>
                   <div className="space-y-2">

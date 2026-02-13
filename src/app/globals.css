@@ -122,6 +122,10 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --brand-dark: #EDF2F2;
+  --brand-gray: #A0AEB2;
+  --brand-light: #1E2225;
+  --brand-green: #5EDBA8;
 }
 
 @layer base {

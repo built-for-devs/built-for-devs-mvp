@@ -32,7 +32,7 @@ export function Benefits() {
           {benefits.map((benefit) => (
             <div
               key={benefit.title}
-              className="rounded-xl bg-white p-6 shadow-sm"
+              className="rounded-xl bg-card p-6 shadow-sm"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-green/15">
                 <benefit.icon className="h-6 w-6 text-brand-green" />

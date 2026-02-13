@@ -49,7 +49,7 @@ export default async function BlogPostPage({ params }: Props) {
   if (!post) notFound();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <Nav />
       <article className="px-6 py-16">
         <div className="mx-auto max-w-3xl">

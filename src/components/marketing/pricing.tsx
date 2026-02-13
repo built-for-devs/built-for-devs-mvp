@@ -21,7 +21,7 @@ export function Pricing() {
           evaluations you need.
         </p>
 
-        <div className="mx-auto mt-12 max-w-md rounded-2xl border bg-white p-8 shadow-sm">
+        <div className="mx-auto mt-12 max-w-md rounded-2xl border bg-card p-8 shadow-sm">
           <div className="text-center">
             <p className="text-sm font-medium uppercase tracking-wide text-brand-gray">
               Per evaluation
@@ -44,7 +44,7 @@ export function Pricing() {
           <div className="mt-6 text-center">
             <Link
               href="/score"
-              className="inline-block rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-brand-dark transition-colors hover:bg-brand-green/80"
+              className="inline-block rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-[#171717] transition-colors hover:bg-brand-green/80"
             >
               Get Started
             </Link>

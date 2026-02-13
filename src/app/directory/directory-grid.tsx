@@ -51,9 +51,9 @@ export function DirectoryGrid({ products }: Props) {
                       <div
                         className={`mt-1 flex items-center justify-end gap-0.5 text-xs font-medium ${
                           delta > 0
-                            ? "text-green-600"
+                            ? "text-green-600 dark:text-green-400"
                             : delta < 0
-                              ? "text-red-500"
+                              ? "text-red-500 dark:text-red-400"
                               : "text-muted-foreground"
                         }`}
                       >

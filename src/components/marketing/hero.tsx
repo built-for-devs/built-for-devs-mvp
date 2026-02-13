@@ -21,7 +21,7 @@ export function Hero() {
         <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
           <Link
             href="/score"
-            className="rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-brand-dark transition-colors hover:bg-brand-green/80"
+            className="rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-[#171717] transition-colors hover:bg-brand-green/80"
           >
             Get Started
           </Link>

@@ -15,12 +15,12 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 const statusColors: Record<string, string> = {
-  approved: "bg-green-100 text-green-700",
-  paid: "bg-green-100 text-green-700",
-  in_review: "bg-yellow-100 text-yellow-700",
-  submitted: "bg-blue-100 text-blue-700",
-  recording: "bg-indigo-100 text-indigo-700",
-  accepted: "bg-purple-100 text-purple-700",
+  approved: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  paid: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  in_review: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  submitted: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  recording: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+  accepted: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
 };
 
 export default async function CompanyEvaluationDetailPage({

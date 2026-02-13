@@ -37,7 +37,7 @@ export function HowItWorks() {
         <div className="mt-12 grid gap-8 md:grid-cols-2">
           {steps.map((step) => (
             <div key={step.number} className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-green text-lg font-bold text-brand-dark">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-green text-lg font-bold text-[#171717]">
                 {step.number}
               </div>
               <div>
@@ -54,7 +54,7 @@ export function HowItWorks() {
         <div className="mt-12 text-center">
           <Link
             href="/score"
-            className="rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-brand-dark transition-colors hover:bg-brand-green/80"
+            className="rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-[#171717] transition-colors hover:bg-brand-green/80"
           >
             Get Started
           </Link>

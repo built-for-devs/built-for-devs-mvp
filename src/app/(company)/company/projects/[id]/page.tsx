@@ -21,15 +21,15 @@ import { CopyButton } from "./evaluations/[evalId]/copy-button";
 import { CheckoutButton } from "./checkout-button";
 
 const statusColors: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  pending_payment: "bg-yellow-100 text-yellow-700",
-  paid: "bg-blue-100 text-blue-700",
-  matching: "bg-purple-100 text-purple-700",
-  in_progress: "bg-indigo-100 text-indigo-700",
-  evaluations_complete: "bg-teal-100 text-teal-700",
-  report_drafting: "bg-orange-100 text-orange-700",
-  delivered: "bg-green-100 text-green-700",
-  closed: "bg-gray-100 text-gray-500",
+  draft: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  pending_payment: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  paid: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  matching: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  in_progress: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+  evaluations_complete: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
+  report_drafting: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  delivered: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  closed: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
 
 const statusMessages: Record<string, string> = {
@@ -96,12 +96,12 @@ export default async function ProjectDetailPage({
     <div className="space-y-6">
       {/* Payment notification */}
       {payment === "success" && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-800">
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-800 dark:border-green-800 dark:bg-green-900/30 dark:text-green-400">
           Payment successful! We&apos;ll start matching you with developers shortly.
         </div>
       )}
       {payment === "cancelled" && (
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-800">
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
           Payment was cancelled. You can proceed to payment whenever you&apos;re ready.
         </div>
       )}

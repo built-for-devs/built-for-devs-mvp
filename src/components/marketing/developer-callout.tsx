@@ -16,7 +16,7 @@ export function DeveloperCallout() {
         </p>
         <Link
           href="/developers"
-          className="mt-8 inline-block rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-brand-dark transition-colors hover:bg-brand-green/80"
+          className="mt-8 inline-block rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-[#171717] transition-colors hover:bg-brand-green/80"
         >
           Start Earning
         </Link>

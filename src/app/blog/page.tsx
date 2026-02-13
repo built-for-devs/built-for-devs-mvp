@@ -20,7 +20,7 @@ export default function BlogIndexPage() {
   const posts = getAllPosts();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <Nav />
       <section className="px-6 py-16">
         <div className="mx-auto max-w-4xl">

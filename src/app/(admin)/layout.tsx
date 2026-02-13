@@ -13,6 +13,7 @@ import {
   LogOut,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -59,15 +60,18 @@ export default function AdminLayout({
           })}
         </nav>
         <div className="border-t p-3">
-          <form action="/api/auth/signout" method="post">
-            <button
-              type="submit"
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
-          </form>
+          <div className="flex items-center justify-between">
+            <form action="/api/auth/signout" method="post">
+              <button
+                type="submit"
+                className="flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </form>
+            <ThemeToggle />
+          </div>
         </div>
       </aside>
 

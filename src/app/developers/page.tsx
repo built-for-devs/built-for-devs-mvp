@@ -84,7 +84,7 @@ const benefits = [
 
 export default function ForDevelopersPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <Nav />
 
       {/* Hero */}
@@ -102,7 +102,7 @@ export default function ForDevelopersPage() {
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link
               href="/developers/join"
-              className="rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-brand-dark transition-colors hover:bg-brand-green/80"
+              className="rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-[#171717] transition-colors hover:bg-brand-green/80"
             >
               Get Paid to Build
             </Link>
@@ -125,7 +125,7 @@ export default function ForDevelopersPage() {
           <div className="mt-12 grid gap-8 md:grid-cols-2">
             {steps.map((step) => (
               <div key={step.number} className="flex gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-green text-lg font-bold text-brand-dark">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-green text-lg font-bold text-[#171717]">
                   {step.number}
                 </div>
                 <div>
@@ -171,7 +171,7 @@ export default function ForDevelopersPage() {
             What to expect
           </h2>
           <div className="mt-12 space-y-6">
-            <div className="rounded-xl border bg-white p-6">
+            <div className="rounded-xl border bg-card p-6">
               <h3 className="font-semibold text-brand-dark">
                 How long does an evaluation take?
               </h3>
@@ -182,7 +182,7 @@ export default function ForDevelopersPage() {
                 and voice.
               </p>
             </div>
-            <div className="rounded-xl border bg-white p-6">
+            <div className="rounded-xl border bg-card p-6">
               <h3 className="font-semibold text-brand-dark">
                 What products will I evaluate?
               </h3>
@@ -192,7 +192,7 @@ export default function ForDevelopersPage() {
                 background and experience.
               </p>
             </div>
-            <div className="rounded-xl border bg-white p-6">
+            <div className="rounded-xl border bg-card p-6">
               <h3 className="font-semibold text-brand-dark">
                 How do I get paid?
               </h3>
@@ -202,7 +202,7 @@ export default function ForDevelopersPage() {
                 PayPal email during profile creation.
               </p>
             </div>
-            <div className="rounded-xl border bg-white p-6">
+            <div className="rounded-xl border bg-card p-6">
               <h3 className="font-semibold text-brand-dark">
                 How much do I get paid?
               </h3>
@@ -210,7 +210,7 @@ export default function ForDevelopersPage() {
                 You earn $129 USD per approved evaluation.
               </p>
             </div>
-            <div className="rounded-xl border bg-white p-6">
+            <div className="rounded-xl border bg-card p-6">
               <h3 className="font-semibold text-brand-dark">
                 How often will I get invitations?
               </h3>
@@ -226,18 +226,18 @@ export default function ForDevelopersPage() {
       </section>
 
       {/* Bottom CTA */}
-      <section className="bg-brand-dark px-6 py-20">
+      <section className="bg-primary px-6 py-20">
         <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-bold text-white">
+          <h2 className="text-3xl font-bold text-primary-foreground">
             Your developer experience is valuable.
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-white/70">
+          <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/70">
             Join our network and get paid to share honest feedback on developer
             tools.
           </p>
           <Link
             href="/developers/join"
-            className="mt-8 inline-block rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-brand-dark transition-colors hover:bg-brand-green/80"
+            className="mt-8 inline-block rounded-lg bg-brand-green px-6 py-3 text-base font-medium text-[#171717] transition-colors hover:bg-brand-green/80"
           >
             Get Paid to Build
           </Link>

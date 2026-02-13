@@ -15,15 +15,15 @@ import { Plus } from "lucide-react";
 import { formatEnumLabel } from "@/lib/admin/filter-options";
 
 const statusColors: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  pending_payment: "bg-yellow-100 text-yellow-700",
-  paid: "bg-blue-100 text-blue-700",
-  matching: "bg-purple-100 text-purple-700",
-  in_progress: "bg-indigo-100 text-indigo-700",
-  evaluations_complete: "bg-teal-100 text-teal-700",
-  report_drafting: "bg-orange-100 text-orange-700",
-  delivered: "bg-green-100 text-green-700",
-  closed: "bg-gray-100 text-gray-500",
+  draft: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  pending_payment: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  paid: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  matching: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  in_progress: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+  evaluations_complete: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
+  report_drafting: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  delivered: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  closed: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
 
 export default async function CompanyProjectsPage() {
