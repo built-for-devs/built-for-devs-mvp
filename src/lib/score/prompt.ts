@@ -103,10 +103,10 @@ After computing: final_score = base_score + total_deductions (deductions are neg
 
 ## Critical Rules
 1. Start from zero trust. Developers are skeptical by default.
-2. Score based ONLY on what is present in the provided crawled content. Do not assume features exist if they are not shown.
+2. Score based on what is demonstrated in the crawled content. You do NOT need to crawl every page to give a 10. Use the quality of sampled pages combined with the visible breadth of resources. For example: if one integration guide is excellent and the navigation lists 15 more, that's strong evidence of comprehensive integration coverage. If a docs landing page shows well-organized sections for tutorials, cookbooks, and SDKs across many languages, the breadth is clear even from a single page. The principle: high quality in sampled content + visible breadth of similar content = high score. Low quality or thin content with no visible breadth = low score.
 3. Be specific in evidence arrays. Quote or reference actual content from the crawled pages.
-4. If a page was not crawled or not found (e.g., documentation URL returned an error), score that category based on whether links to it are visible in navigation or content, but note the limitation. Common third-party documentation platforms (GitBook, ReadMe, Mintlify, Notion, Stoplight, Redocly, etc.) are legitimate documentation hosts. If links to these platforms are found in the crawled content, treat them as real documentation even if the pages couldn't be crawled directly.
-5. When scoring Documentation Quality (category 6) and Technical Depth (category 7), weight the existence and organization of doc links heavily. A product that links to well-structured documentation on a recognized platform should not be penalized just because the crawler couldn't fetch those pages. Look for signals like organized navigation, multiple doc sections, API references, and quickstart guides in the link structure.
+4. Common third-party documentation platforms (GitBook, ReadMe, Mintlify, Notion, Stoplight, Redocly, etc.) are legitimate documentation hosts. If links to these platforms are found in the crawled content, treat them as real documentation even if the pages couldn't be crawled directly.
+5. When the crawler discovers a large number of documentation links (15+), this is itself strong evidence of comprehensive developer resources. Combined with high quality in the pages that were sampled, this should push documentation-related scores (categories 5, 6, 7, 9, 11) toward the top of the scale.
 6. Apply all matching red flag deductions. Multiple deductions can stack. For "No documentation visible", only apply this deduction if there are genuinely no documentation links anywhere in the crawled content — not even links to third-party doc platforms like ReadMe, GitBook, or Mintlify.
 7. The "what_ai_cant_tell_you" array must contain 3-5 product-specific observations that ONLY hands-on developer testing would reveal. Be specific to THIS product — not generic.
 8. Quick wins should be actionable changes that could improve the score with low-to-medium effort.
@@ -155,7 +155,7 @@ export function buildUserMessage(
 
   message += `## Crawl Summary\n`;
   message += `- Successfully crawled ${successful.length} page(s): ${successful.map((p) => p.label).join(", ")}\n`;
-  message += `\nNote: We crawled the homepage and followed links found on it. The pages listed below are what we could successfully retrieve. Score based on this content plus any documentation/resources that are clearly linked from the crawled pages.\n\n`;
+  message += `\nNote: We crawled the homepage and followed links found on it. The pages below are a sample of the site's content. Score based on the quality of what you see combined with the visible breadth of resources linked from the crawled pages.\n\n`;
 
   // Show discovered documentation links (crawled or not)
   const docLinks = crawlResult.discoveredDocLinks ?? [];
@@ -165,8 +165,8 @@ export function buildUserMessage(
         .filter((p) => p.status === "success")
         .map((p) => p.url)
     );
-    message += `## Discovered Documentation Links\n`;
-    message += `The following documentation links were found on the site. Those marked [crawled] were successfully retrieved. Those marked [linked only] were discovered but could not be fetched — their existence should still be considered when scoring documentation-related categories.\n\n`;
+    message += `## Discovered Documentation Links (${docLinks.length} total)\n`;
+    message += `The following documentation links were found on the site. Those marked [crawled] were successfully retrieved. Those marked [linked only] were discovered but not fetched. The breadth of this link structure is a strong signal — a site with ${docLinks.length} documentation links demonstrates the scope of its developer resources even from the pages we sampled.\n\n`;
     for (const link of docLinks) {
       const status = crawledUrls.has(link.url) ? "crawled" : "linked only";
       message += `- [${status}] ${link.label}: ${link.url}\n`;
@@ -185,7 +185,7 @@ export function buildUserMessage(
   message += `---\n\nEvaluate this product using the Developer Adoption Score framework. Return your evaluation as a JSON object matching this exact schema:\n\n`;
   message += JSON_SCHEMA;
   message += `\n\nRemember:\n`;
-  message += `- Score based on the crawled content above, but also consider documentation/resources that are clearly LINKED from the crawled pages even if we couldn't crawl them directly\n`;
+  message += `- Score based on demonstrated quality + visible breadth. If sampled pages are excellent and the site clearly has extensive resources beyond what we crawled, score accordingly\n`;
   message += `- Be specific in evidence — reference actual content you can see\n`;
   message += `- Apply red flag deductions only when there is clear evidence of the issue — not merely because a page was unreachable by our crawler\n`;
   message += `- "what_ai_cant_tell_you" must be specific to THIS product\n`;
