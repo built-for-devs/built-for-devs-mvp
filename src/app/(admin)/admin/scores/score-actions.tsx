@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MoreHorizontal, Eye, EyeOff, Trash2 } from "lucide-react";
+import { MoreHorizontal, Eye, EyeOff, Trash2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,8 +30,28 @@ export function ScoreActions({
   status,
   directoryHidden,
 }: ScoreActionsProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
+  async function handleRetry() {
+    setRetrying(true);
+    try {
+      const res = await fetch("/api/admin/retry-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scoreId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        console.error("Retry failed:", data.error);
+      }
+      router.refresh();
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   return (
     <>
@@ -68,6 +89,12 @@ export function ScoreActions({
                   Hide from directory
                 </>
               )}
+            </DropdownMenuItem>
+          )}
+          {status === "failed" && (
+            <DropdownMenuItem disabled={retrying} onClick={handleRetry}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              {retrying ? "Retrying..." : "Retry"}
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
