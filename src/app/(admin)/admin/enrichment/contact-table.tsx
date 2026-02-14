@@ -117,13 +117,6 @@ export function ContactTable({ groupId }: { groupId: string }) {
     fetchContacts();
   }, [fetchContacts]);
 
-  // Auto-load all remaining contacts when sorting by LinkedIn presence
-  useEffect(() => {
-    if (sortBy === "has-linkedin-first" && nextCursor && !loadingMore) {
-      fetchContacts(nextCursor);
-    }
-  }, [sortBy, nextCursor, loadingMore, fetchContacts]);
-
   function applyPreset(value: string) {
     if (activeFilter === value) {
       setActiveFilter("");
