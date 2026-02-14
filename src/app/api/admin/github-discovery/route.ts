@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { findGitHubUser, type EnrichmentInput } from "@/lib/enrichment";
-import { searchGitHubProfile, crawlForGitHub, findGitHubViaWebsite } from "@/lib/serper";
+import { searchGitHubProfile, crawlForSocials, findSocialsViaWebsite, type CrawledSocials } from "@/lib/serper";
 
 export const maxDuration = 120;
 
@@ -20,6 +20,22 @@ interface DiscoveryResult {
   githubUrl?: string;
   taskId?: string;
   source?: string;
+}
+
+/**
+ * Build an update payload from crawled social links.
+ * Only includes fields that are found AND not already set on the developer.
+ */
+function buildSocialUpdate(
+  socials: CrawledSocials,
+  dev: { twitter_url?: string | null; website_url?: string | null; personal_email?: string | null; linkedin_url?: string | null }
+): Record<string, string> {
+  const update: Record<string, string> = {};
+  if (socials.twitterUrl && !dev.twitter_url) update.twitter_url = socials.twitterUrl;
+  if (socials.websiteUrl && !dev.website_url) update.website_url = socials.websiteUrl;
+  if (socials.personalEmail && !dev.personal_email) update.personal_email = socials.personalEmail;
+  if (socials.linkedinUrl && !dev.linkedin_url) update.linkedin_url = socials.linkedinUrl;
+  return update;
 }
 
 export async function POST(request: NextRequest) {
@@ -45,7 +61,7 @@ export async function POST(request: NextRequest) {
 
   const { data: developers, error: fetchError } = await serviceClient
     .from("developers")
-    .select("id, github_url, linkedin_url, website_url, job_title, current_company, city, profiles!inner(full_name, email)")
+    .select("id, github_url, linkedin_url, website_url, twitter_url, personal_email, job_title, current_company, city, profiles!inner(full_name, email)")
     .in("id", developerIds);
 
   if (fetchError || !developers) {
@@ -121,17 +137,18 @@ export async function POST(request: NextRequest) {
       console.error(`Serper search failed for ${profile.full_name}:`, err);
     }
 
-    // 4. Crawl existing website_url for GitHub links
+    // 4. Crawl existing website_url for social links (GitHub, Twitter, email, etc.)
     if (dev.website_url) {
       try {
-        const username = await crawlForGitHub(dev.website_url);
-        if (username) {
-          const githubUrl = `https://github.com/${username}`;
+        const socials = await crawlForSocials(dev.website_url);
+        if (socials?.githubUsername) {
+          const githubUrl = `https://github.com/${socials.githubUsername}`;
+          const extraFields = buildSocialUpdate(socials, dev);
           await serviceClient
             .from("developers")
-            .update({ github_url: githubUrl })
+            .update({ github_url: githubUrl, ...extraFields })
             .eq("id", dev.id);
-          console.log(`[Discovery] ${profile.full_name}: found via website crawl → @${username}`);
+          console.log(`[Discovery] ${profile.full_name}: found via website crawl → @${socials.githubUsername}`, extraFields);
           results.push({
             developerId: dev.id,
             name: profile.full_name,
@@ -146,16 +163,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. Google for their website, then crawl it for GitHub links
+    // 5. Google for their website, then crawl it for social links
     try {
-      const username = await findGitHubViaWebsite(profile.full_name, dev.current_company);
-      if (username) {
-        const githubUrl = `https://github.com/${username}`;
+      const socials = await findSocialsViaWebsite(profile.full_name, dev.current_company);
+      if (socials?.githubUsername) {
+        const githubUrl = `https://github.com/${socials.githubUsername}`;
+        const extraFields = buildSocialUpdate(socials, dev);
         await serviceClient
           .from("developers")
-          .update({ github_url: githubUrl })
+          .update({ github_url: githubUrl, ...extraFields })
           .eq("id", dev.id);
-        console.log(`[Discovery] ${profile.full_name}: found via website Google → @${username}`);
+        console.log(`[Discovery] ${profile.full_name}: found via website Google → @${socials.githubUsername}`, extraFields);
         results.push({
           developerId: dev.id,
           name: profile.full_name,

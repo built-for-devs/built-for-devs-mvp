@@ -134,27 +134,71 @@ async function serperSearchForGitHubMention(key: string, q: string): Promise<str
 }
 
 /**
- * Extract a GitHub username from HTML by scanning for github.com links.
+ * Social links extracted from crawling a webpage.
  */
-function extractGitHubFromHtml(html: string): string | null {
-  const githubPattern = /https?:\/\/(?:www\.)?github\.com\/([a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)(?:["'\s/?>])/g;
+export interface CrawledSocials {
+  githubUsername: string | null;
+  twitterUrl: string | null;
+  linkedinUrl: string | null;
+  personalEmail: string | null;
+  websiteUrl: string | null; // the page we crawled (if it's a personal site)
+}
 
+/**
+ * Extract all social links from HTML: GitHub, Twitter, LinkedIn, email.
+ */
+function extractSocialsFromHtml(html: string): CrawledSocials {
+  const result: CrawledSocials = {
+    githubUsername: null,
+    twitterUrl: null,
+    linkedinUrl: null,
+    personalEmail: null,
+    websiteUrl: null,
+  };
+
+  // GitHub
+  const githubPattern = /https?:\/\/(?:www\.)?github\.com\/([a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)(?:["'\s/?>])/g;
   let match;
   while ((match = githubPattern.exec(html)) !== null) {
     const username = match[1];
     if (!RESERVED_PATHS.has(username.toLowerCase())) {
-      return username;
+      result.githubUsername = username;
+      break;
     }
   }
 
-  return null;
+  // Twitter/X
+  const twitterPattern = /https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)(?:["'\s/?>])/;
+  const twitterMatch = html.match(twitterPattern);
+  if (twitterMatch) {
+    const handle = twitterMatch[1].toLowerCase();
+    const twitterReserved = new Set(["home", "explore", "search", "settings", "login", "signup", "i", "intent", "share"]);
+    if (!twitterReserved.has(handle)) {
+      result.twitterUrl = `https://x.com/${twitterMatch[1]}`;
+    }
+  }
+
+  // LinkedIn
+  const linkedinPattern = /https?:\/\/(?:www\.)?linkedin\.com\/in\/([a-zA-Z0-9_-]+)(?:["'\s/?>])/;
+  const linkedinMatch = html.match(linkedinPattern);
+  if (linkedinMatch) {
+    result.linkedinUrl = `https://linkedin.com/in/${linkedinMatch[1]}`;
+  }
+
+  // Personal email (gmail, hey, proton, fastmail, etc. — not work domains)
+  const emailPattern = /(?:href="mailto:|[\s>])([a-zA-Z0-9._%+-]+@(?:gmail|hey|proton(?:mail)?|fastmail|icloud|outlook|hotmail|yahoo|pm|tutanota)\.[a-z]{2,})(?:["'\s<?>])/gi;
+  const emailMatch = emailPattern.exec(html);
+  if (emailMatch) {
+    result.personalEmail = emailMatch[1].toLowerCase();
+  }
+
+  return result;
 }
 
 /**
- * Crawl a URL and scan the page for GitHub profile links.
- * Returns the GitHub username if found, or null.
+ * Crawl a URL and extract all social links (GitHub, Twitter, LinkedIn, email).
  */
-export async function crawlForGitHub(url: string): Promise<string | null> {
+export async function crawlForSocials(url: string): Promise<CrawledSocials | null> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "BFD-Bot/1.0" },
@@ -167,22 +211,31 @@ export async function crawlForGitHub(url: string): Promise<string | null> {
     if (!contentType.includes("text/html")) return null;
 
     const html = await res.text();
-    return extractGitHubFromHtml(html.slice(0, 100_000));
+    return extractSocialsFromHtml(html.slice(0, 100_000));
   } catch {
     return null;
   }
 }
 
 /**
- * Google for a person's website, then crawl it looking for GitHub links.
- * Skips social media sites (LinkedIn, Twitter, Facebook) since those
- * won't have GitHub links in their HTML.
+ * Crawl a URL and scan the page for GitHub profile links.
  * Returns the GitHub username if found, or null.
  */
-export async function findGitHubViaWebsite(
+export async function crawlForGitHub(url: string): Promise<string | null> {
+  const socials = await crawlForSocials(url);
+  return socials?.githubUsername ?? null;
+}
+
+/**
+ * Google for a person's website, then crawl it looking for social links.
+ * Skips social media sites (LinkedIn, Twitter, Facebook) since those
+ * won't have useful social links in their HTML.
+ * Returns all found social links including GitHub, Twitter, email, etc.
+ */
+export async function findSocialsViaWebsite(
   name: string,
   company?: string | null
-): Promise<string | null> {
+): Promise<CrawledSocials | null> {
   const key = getApiKey();
 
   // Skip social media / large platforms — we only want personal sites
@@ -217,8 +270,11 @@ export async function findGitHubViaWebsite(
         const domain = new URL(result.link).hostname.replace(/^www\./, "");
         if (skipDomains.some((d) => domain === d || domain.endsWith(`.${d}`))) continue;
 
-        const username = await crawlForGitHub(result.link);
-        if (username) return username;
+        const socials = await crawlForSocials(result.link);
+        if (socials?.githubUsername) {
+          socials.websiteUrl = result.link;
+          return socials;
+        }
       } catch {
         continue;
       }
@@ -226,6 +282,15 @@ export async function findGitHubViaWebsite(
   }
 
   return null;
+}
+
+/** @deprecated Use findSocialsViaWebsite instead */
+export async function findGitHubViaWebsite(
+  name: string,
+  company?: string | null
+): Promise<string | null> {
+  const socials = await findSocialsViaWebsite(name, company);
+  return socials?.githubUsername ?? null;
 }
 
 async function serperSearch(key: string, q: string): Promise<string | null> {
