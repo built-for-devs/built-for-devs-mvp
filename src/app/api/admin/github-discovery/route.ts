@@ -25,16 +25,30 @@ interface DiscoveryResult {
 /**
  * Build an update payload from crawled social links.
  * Only includes fields that are found AND not already set on the developer.
+ * Merges discovered emails into alternative_emails (deduped against primary email).
  */
 function buildSocialUpdate(
   socials: CrawledSocials,
-  dev: { twitter_url?: string | null; website_url?: string | null; personal_email?: string | null; linkedin_url?: string | null }
-): Record<string, string> {
-  const update: Record<string, string> = {};
+  dev: { twitter_url?: string | null; website_url?: string | null; personal_email?: string | null; linkedin_url?: string | null; alternative_emails?: string[] | null },
+  primaryEmail?: string
+): Record<string, unknown> {
+  const update: Record<string, unknown> = {};
   if (socials.twitterUrl && !dev.twitter_url) update.twitter_url = socials.twitterUrl;
   if (socials.websiteUrl && !dev.website_url) update.website_url = socials.websiteUrl;
   if (socials.personalEmail && !dev.personal_email) update.personal_email = socials.personalEmail;
   if (socials.linkedinUrl && !dev.linkedin_url) update.linkedin_url = socials.linkedinUrl;
+
+  // Merge all discovered emails into alternative_emails
+  if (socials.emails.length > 0) {
+    const existing = new Set((dev.alternative_emails ?? []).map((e: string) => e.toLowerCase()));
+    if (primaryEmail) existing.add(primaryEmail.toLowerCase());
+    if (dev.personal_email) existing.add(dev.personal_email.toLowerCase());
+    const newEmails = socials.emails.filter((e) => !existing.has(e.toLowerCase()));
+    if (newEmails.length > 0) {
+      update.alternative_emails = [...(dev.alternative_emails ?? []), ...newEmails];
+    }
+  }
+
   return update;
 }
 
@@ -61,7 +75,7 @@ export async function POST(request: NextRequest) {
 
   const { data: developers, error: fetchError } = await serviceClient
     .from("developers")
-    .select("id, github_url, linkedin_url, website_url, twitter_url, personal_email, job_title, current_company, city, profiles!inner(full_name, email)")
+    .select("id, github_url, linkedin_url, website_url, twitter_url, personal_email, alternative_emails, job_title, current_company, city, profiles!inner(full_name, email)")
     .in("id", developerIds);
 
   if (fetchError || !developers) {
@@ -143,7 +157,7 @@ export async function POST(request: NextRequest) {
         const socials = await crawlForSocials(dev.website_url);
         if (socials?.githubUsername) {
           const githubUrl = `https://github.com/${socials.githubUsername}`;
-          const extraFields = buildSocialUpdate(socials, dev);
+          const extraFields = buildSocialUpdate(socials, dev, profile.email);
           await serviceClient
             .from("developers")
             .update({ github_url: githubUrl, ...extraFields })
@@ -168,7 +182,7 @@ export async function POST(request: NextRequest) {
       const socials = await findSocialsViaWebsite(profile.full_name, dev.current_company);
       if (socials?.githubUsername) {
         const githubUrl = `https://github.com/${socials.githubUsername}`;
-        const extraFields = buildSocialUpdate(socials, dev);
+        const extraFields = buildSocialUpdate(socials, dev, profile.email);
         await serviceClient
           .from("developers")
           .update({ github_url: githubUrl, ...extraFields })

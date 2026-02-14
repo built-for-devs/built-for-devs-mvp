@@ -99,6 +99,7 @@ export type Database = {
           buying_influence:
             | Database["public"]["Enums"]["buying_influence_level"]
             | null
+          alternative_emails: string[] | null
           cicd_tools: string[] | null
           city: string | null
           cloud_platforms: string[] | null
@@ -149,6 +150,7 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          alternative_emails?: string[] | null
           api_experience?: string[] | null
           buying_influence?:
             | Database["public"]["Enums"]["buying_influence_level"]
@@ -203,6 +205,7 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          alternative_emails?: string[] | null
           api_experience?: string[] | null
           buying_influence?:
             | Database["public"]["Enums"]["buying_influence_level"]

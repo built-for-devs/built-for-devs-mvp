@@ -35,7 +35,7 @@ export async function POST() {
   // Find all developers with pending SixtyFour tasks
   const { data: pending, error } = await serviceClient
     .from("developers")
-    .select("id, sixtyfour_task_id, profiles!inner(full_name)")
+    .select("id, sixtyfour_task_id, personal_email, alternative_emails, profiles!inner(full_name, email)")
     .not("sixtyfour_task_id", "is", null);
 
   if (error) {
@@ -49,7 +49,7 @@ export async function POST() {
   const results: CollectResult[] = [];
 
   for (const dev of pending) {
-    const profile = dev.profiles as unknown as { full_name: string };
+    const profile = dev.profiles as unknown as { full_name: string; email: string };
     const taskId = dev.sixtyfour_task_id as string;
 
     try {
@@ -57,7 +57,7 @@ export async function POST() {
 
       if (result.status === "completed") {
         // Build update payload from all returned fields
-        const update: Record<string, string | null> = { sixtyfour_task_id: null };
+        const update: Record<string, unknown> = { sixtyfour_task_id: null };
         const fieldsFound: string[] = [];
 
         if (result.githubUrl) {
@@ -75,6 +75,20 @@ export async function POST() {
         if (result.websiteUrl) {
           update.website_url = result.websiteUrl;
           fieldsFound.push("website");
+        }
+
+        // Merge alternative emails (dedup against primary + personal + existing)
+        const altEmails = result.alternativeEmails ?? [];
+        if (altEmails.length > 0) {
+          const existing = new Set(((dev.alternative_emails as string[]) ?? []).map((e: string) => e.toLowerCase()));
+          existing.add(profile.email.toLowerCase());
+          if (dev.personal_email) existing.add((dev.personal_email as string).toLowerCase());
+          if (result.personalEmail) existing.add(result.personalEmail.toLowerCase());
+          const newEmails = altEmails.filter((e) => !existing.has(e.toLowerCase()));
+          if (newEmails.length > 0) {
+            update.alternative_emails = [...((dev.alternative_emails as string[]) ?? []), ...newEmails];
+            fieldsFound.push(`${newEmails.length} alt email(s)`);
+          }
         }
 
         console.log(`SixtyFour collect for ${profile.full_name}: updating`, update);

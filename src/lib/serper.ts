@@ -141,18 +141,31 @@ export interface CrawledSocials {
   twitterUrl: string | null;
   linkedinUrl: string | null;
   personalEmail: string | null;
+  emails: string[]; // all emails found on the page
   websiteUrl: string | null; // the page we crawled (if it's a personal site)
 }
 
 /**
  * Extract all social links from HTML: GitHub, Twitter, LinkedIn, email.
  */
+const PERSONAL_EMAIL_DOMAINS = new Set([
+  "gmail", "hey", "protonmail", "proton", "fastmail", "icloud",
+  "outlook", "hotmail", "yahoo", "pm", "tutanota", "me",
+]);
+
+const JUNK_EMAIL_PREFIXES = new Set([
+  "noreply", "no-reply", "info", "support", "hello", "hi",
+  "contact", "admin", "webmaster", "postmaster", "sales",
+  "marketing", "team", "help", "feedback", "press",
+]);
+
 function extractSocialsFromHtml(html: string): CrawledSocials {
   const result: CrawledSocials = {
     githubUsername: null,
     twitterUrl: null,
     linkedinUrl: null,
     personalEmail: null,
+    emails: [],
     websiteUrl: null,
   };
 
@@ -185,11 +198,27 @@ function extractSocialsFromHtml(html: string): CrawledSocials {
     result.linkedinUrl = `https://linkedin.com/in/${linkedinMatch[1]}`;
   }
 
-  // Personal email (gmail, hey, proton, fastmail, etc. — not work domains)
-  const emailPattern = /(?:href="mailto:|[\s>])([a-zA-Z0-9._%+-]+@(?:gmail|hey|proton(?:mail)?|fastmail|icloud|outlook|hotmail|yahoo|pm|tutanota)\.[a-z]{2,})(?:["'\s<?>])/gi;
-  const emailMatch = emailPattern.exec(html);
-  if (emailMatch) {
-    result.personalEmail = emailMatch[1].toLowerCase();
+  // Emails — collect ALL unique emails from the page
+  const allEmailPattern = /(?:href="mailto:|[\s>:,])([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,})(?:["'\s<?>:,])/gi;
+  const seen = new Set<string>();
+  let emailMatch;
+  while ((emailMatch = allEmailPattern.exec(html)) !== null) {
+    const email = emailMatch[1].toLowerCase();
+    if (seen.has(email)) continue;
+    seen.add(email);
+
+    // Skip junk/generic addresses
+    const prefix = email.split("@")[0];
+    if (JUNK_EMAIL_PREFIXES.has(prefix)) continue;
+
+    // Check if it's a personal email provider
+    const domainBase = email.split("@")[1].split(".")[0];
+    const isPersonal = PERSONAL_EMAIL_DOMAINS.has(domainBase);
+
+    if (isPersonal && !result.personalEmail) {
+      result.personalEmail = email;
+    }
+    result.emails.push(email);
   }
 
   return result;

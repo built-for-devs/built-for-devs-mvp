@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
   // Look up developer + profile data
   const { data: developers, error: fetchError } = await serviceClient
     .from("developers")
-    .select("id, job_title, current_company, linkedin_url, github_url, folk_person_id, folk_group_id, profiles!inner(full_name, email)")
+    .select("id, job_title, current_company, linkedin_url, github_url, personal_email, alternative_emails, folk_person_id, folk_group_id, profiles!inner(full_name, email)")
     .in("id", developerIds);
 
   if (fetchError || !developers) {
@@ -130,6 +130,17 @@ export async function POST(request: NextRequest) {
     if (result.status !== "failed" && result.data) {
       const fields = buildDevFields(result.data);
       fields.last_enriched_at = new Date().toISOString();
+
+      // Merge GitHub public email into alternative_emails
+      if (result.githubEmail) {
+        const existing = new Set(((dev.alternative_emails as string[]) ?? []).map((e: string) => e.toLowerCase()));
+        existing.add(profile.email.toLowerCase());
+        if (dev.personal_email) existing.add((dev.personal_email as string).toLowerCase());
+        if (!existing.has(result.githubEmail.toLowerCase())) {
+          fields.alternative_emails = [...((dev.alternative_emails as string[]) ?? []), result.githubEmail.toLowerCase()];
+        }
+      }
+
       const { error: updateError } = await serviceClient
         .from("developers")
         .update(fields)

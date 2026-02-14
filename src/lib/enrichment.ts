@@ -63,6 +63,7 @@ export interface EnrichmentData {
 interface GitHubProfile {
   login: string;
   name: string | null;
+  email: string | null;
   company: string | null;
   location: string | null;
   bio: string | null;
@@ -221,6 +222,7 @@ async function getGitHubProfile(
   return {
     login: u.login,
     name: u.name ?? null,
+    email: u.email ?? null,
     company: u.company ?? null,
     location: u.location ?? null,
     bio: u.bio ?? null,
@@ -616,7 +618,7 @@ export async function reEnrichDeveloper(input: {
   jobTitle?: string | null;
   company?: string | null;
   githubUrl?: string | null;
-}): Promise<{ status: "enriched" | "partial" | "failed"; data?: EnrichmentData; error?: string }> {
+}): Promise<{ status: "enriched" | "partial" | "failed"; data?: EnrichmentData; error?: string; githubEmail?: string }> {
   try {
     // If we already have their GitHub URL, extract username directly
     let username: string | null = null;
@@ -666,7 +668,11 @@ export async function reEnrichDeveloper(input: {
       return { status: "failed", error: "No data found" };
     }
 
-    return { status: filled >= 3 ? "enriched" : "partial", data };
+    return {
+      status: filled >= 3 ? "enriched" : "partial",
+      data,
+      githubEmail: profile?.email ?? undefined,
+    };
   } catch (err) {
     return { status: "failed", error: err instanceof Error ? err.message : "Unknown error" };
   }

@@ -30,6 +30,7 @@ export interface SixtyFourResult {
   status: "pending" | "processing" | "completed" | "failed";
   githubUrl?: string | null;
   personalEmail?: string | null;
+  alternativeEmails?: string[];
   twitterUrl?: string | null;
   websiteUrl?: string | null;
   confidenceScore?: number;
@@ -61,6 +62,7 @@ export async function submitGitHubDiscovery(
       struct: {
         github_url: "url for their github profile",
         personal_email: "their personal email address (gmail, hey, proton, etc — not work email)",
+        alternative_emails: "list of any other email addresses found for this person (work emails, other personal emails)",
         twitter_url: "url for their twitter/x profile",
         website_url: "url for their personal website or blog",
       },
@@ -103,11 +105,20 @@ export async function pollGitHubDiscovery(
     const sd = data.structured_data ?? data.result ?? data.output ?? data.data ?? {};
     console.log(`SixtyFour completed for task ${taskId}:`, JSON.stringify(data, null, 2));
     console.log(`SixtyFour parsed structured_data:`, JSON.stringify(sd, null, 2));
+    // Parse alternative_emails — SixtyFour may return string, array, or comma-separated
+    let altEmails: string[] = [];
+    if (Array.isArray(sd.alternative_emails)) {
+      altEmails = sd.alternative_emails.filter((e: unknown) => typeof e === "string" && e.includes("@"));
+    } else if (typeof sd.alternative_emails === "string" && sd.alternative_emails.includes("@")) {
+      altEmails = sd.alternative_emails.split(/[,;\s]+/).filter((e: string) => e.includes("@"));
+    }
+
     return {
       taskId,
       status: "completed",
       githubUrl: sd.github_url || null,
       personalEmail: sd.personal_email || null,
+      alternativeEmails: altEmails,
       twitterUrl: sd.twitter_url || null,
       websiteUrl: sd.website_url || null,
       confidenceScore: data.confidence_score,
