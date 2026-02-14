@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCompanies } from "@/lib/admin/queries";
 import { PageHeader } from "@/components/admin/page-header";
 import { CreateCompanyDialog } from "./create-company-dialog";
+import { CompanyRowActions } from "./company-row-actions";
 import {
   Table,
   TableBody,
@@ -40,6 +41,7 @@ export default async function AdminCompaniesPage() {
                 <TableHead className="text-right">Projects</TableHead>
                 <TableHead className="text-right">Total Spend</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -78,6 +80,9 @@ export default async function AdminCompaniesPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(company.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <CompanyRowActions company={company} />
                   </TableCell>
                 </TableRow>
               ))}

@@ -42,6 +42,7 @@ const MAX_BATCH = 10;
 
 const FILTER_PRESETS = [
   { label: "Engineers & Developers", value: "engineer,developer,software" },
+  { label: "Leadership", value: "cto,vp of engineering,head of engineering,director of engineering,engineering manager,tech lead,chief technology,chief architect" },
   { label: "DevOps & SRE", value: "devops,sre,infrastructure,platform" },
   { label: "Data & ML", value: "data,machine learning,ml,ai,scientist" },
   { label: "Mobile", value: "mobile,ios,android" },
