@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { EyeOff, FolderPlus, Sparkles, Trash2 } from "lucide-react";
+import { CheckCircle, EyeOff, FolderPlus, Loader2, Search, Sparkles, Trash2, XCircle } from "lucide-react";
 import { deleteDevelopersInBulk } from "@/lib/admin/actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -51,6 +51,11 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ deleted: number; errors: string[] } | null>(null);
   const [anonymized, setAnonymized] = useState(false);
+  const [sixtyfourOpen, setSixtyfourOpen] = useState(false);
+  const [sixtyfourSubmitting, setSixtyfourSubmitting] = useState(false);
+  const [sixtyfourResults, setSixtyfourResults] = useState<
+    { developerId: string; name: string; status: string; taskId?: string }[] | null
+  >(null);
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -83,6 +88,30 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
     setResult(null);
   }
 
+  async function handleSixtyfourSubmit() {
+    setSixtyfourSubmitting(true);
+    setSixtyfourOpen(true);
+    try {
+      const res = await fetch("/api/admin/sixtyfour-submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ developerIds: Array.from(selected) }),
+      });
+      if (!res.ok) throw new Error("Submit failed");
+      const data = await res.json();
+      setSixtyfourResults(data.results);
+    } catch {
+      setSixtyfourResults([]);
+    } finally {
+      setSixtyfourSubmitting(false);
+    }
+  }
+
+  function handleCloseSixtyfour() {
+    setSixtyfourOpen(false);
+    setSixtyfourResults(null);
+  }
+
   // Build a name lookup for the bulk project dialog
   const developerNames: Record<string, string> = {};
   for (const dev of developers) {
@@ -104,6 +133,15 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
             >
               <Sparkles className="mr-1.5 h-4 w-4" />
               Enrich ({selected.size})
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSixtyfourSubmit}
+              disabled={sixtyfourSubmitting}
+            >
+              <Search className="mr-1.5 h-4 w-4" />
+              SixtyFour ({selected.size})
             </Button>
             <Button
               size="sm"
@@ -190,6 +228,64 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
         developerNames={developerNames}
         onComplete={() => setSelected(new Set())}
       />
+
+      {/* SixtyFour submit dialog */}
+      <Dialog open={sixtyfourOpen} onOpenChange={handleCloseSixtyfour}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {sixtyfourSubmitting ? "Submitting to SixtyFour..." : "SixtyFour Submission"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {sixtyfourSubmitting ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Submitting {selected.size} developer{selected.size !== 1 ? "s" : ""} for deep enrichment...
+            </div>
+          ) : sixtyfourResults ? (
+            <div className="space-y-4">
+              {sixtyfourResults.length === 0 ? (
+                <p className="text-sm text-destructive">Submission failed. Check console for details.</p>
+              ) : (
+                <div className="max-h-64 overflow-auto space-y-1.5">
+                  {sixtyfourResults.map((r) => (
+                    <div
+                      key={r.developerId}
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    >
+                      <span>{r.name}</span>
+                      <span className="flex items-center gap-1 text-xs">
+                        {r.status === "submitted" && (
+                          <span className="text-green-700 flex items-center gap-1">
+                            <CheckCircle className="h-3.5 w-3.5" /> Submitted
+                          </span>
+                        )}
+                        {r.status === "no_linkedin" && (
+                          <span className="text-amber-600 flex items-center gap-1">
+                            <XCircle className="h-3.5 w-3.5" /> No LinkedIn
+                          </span>
+                        )}
+                        {r.status === "failed" && (
+                          <span className="text-red-600 flex items-center gap-1">
+                            <XCircle className="h-3.5 w-3.5" /> Failed
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                SixtyFour tasks take ~5 minutes. Use the &quot;Collect SixtyFour Results&quot; button to check for completed results.
+              </p>
+              <DialogFooter>
+                <Button onClick={handleCloseSixtyfour}>Done</Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       {/* Bulk delete confirm */}
       <Dialog open={confirmOpen} onOpenChange={handleCloseConfirm}>

@@ -110,7 +110,16 @@ export async function findGitHubUser(
     }
   }
 
-  // 2. Fallback: name search
+  // 2. Try LinkedIn slug as GitHub username (many devs use the same handle)
+  if (input.linkedinUrl) {
+    const slug = input.linkedinUrl.match(/linkedin\.com\/in\/([a-zA-Z0-9_-]+)/)?.[1];
+    if (slug) {
+      const username = await checkGitHubUsername(slug, input.name, headers);
+      if (username) return username;
+    }
+  }
+
+  // 3. Fallback: name + company search
   if (input.name) {
     const nameParts = [input.name];
     if (input.company) nameParts.push(input.company);
@@ -125,7 +134,54 @@ export async function findGitHubUser(
     }
   }
 
+  // 4. Name-only search (without company, catches more results)
+  if (input.name && input.company) {
+    const q = encodeURIComponent(`${input.name} in:name`);
+    const res = await fetch(
+      `https://api.github.com/search/users?q=${q}&per_page=5`,
+      { headers }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.items?.length > 0) return data.items[0].login;
+    }
+  }
+
   return null;
+}
+
+/**
+ * Check if a username exists on GitHub and loosely matches the expected name.
+ * Used to test LinkedIn slugs as potential GitHub usernames.
+ */
+async function checkGitHubUsername(
+  candidateUsername: string,
+  expectedName: string,
+  headers: HeadersInit
+): Promise<string | null> {
+  try {
+    const res = await fetch(`https://api.github.com/users/${candidateUsername}`, { headers });
+    if (!res.ok) return null;
+
+    const user = await res.json();
+    // Accept if the profile exists — the LinkedIn slug is a strong signal
+    // Loose name check: if they have a name set, at least one name part should match
+    if (user.name) {
+      const profileParts = user.name.toLowerCase().split(/\s+/);
+      const expectedParts = expectedName.toLowerCase().split(/\s+/);
+      const hasOverlap = expectedParts.some((p: string) =>
+        profileParts.some((pp: string) => pp === p || pp.startsWith(p) || p.startsWith(pp))
+      );
+      if (hasOverlap) return user.login;
+      // Name doesn't match at all — might be a different person with the same slug
+      return null;
+    }
+
+    // No name set on profile — accept it (LinkedIn slug match is strong enough)
+    return user.login;
+  } catch {
+    return null;
+  }
 }
 
 async function getGitHubProfile(

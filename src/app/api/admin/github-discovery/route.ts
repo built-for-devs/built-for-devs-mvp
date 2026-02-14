@@ -4,7 +4,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { findGitHubUser, type EnrichmentInput } from "@/lib/enrichment";
 import { searchGitHubProfile, crawlForGitHub, findGitHubViaWebsite } from "@/lib/serper";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 function createServiceClient() {
   return createSupabaseClient(
@@ -68,13 +68,14 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    // 2. Try free GitHub API search (email, then name+company)
+    // 2. Try free GitHub API search (email, LinkedIn slug, then name+company)
     try {
       const input: EnrichmentInput = {
         folkId: "",
         name: profile.full_name,
         email: profile.email,
         company: dev.current_company,
+        linkedinUrl: dev.linkedin_url,
       };
       const username = await findGitHubUser(input);
       if (username) {
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
           .from("developers")
           .update({ github_url: githubUrl })
           .eq("id", dev.id);
+        console.log(`[Discovery] ${profile.full_name}: found via GitHub API → @${username}`);
         results.push({
           developerId: dev.id,
           name: profile.full_name,
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
       console.error(`GitHub API search failed for ${profile.full_name}:`, err);
     }
 
-    // 3. Try Serper Google search
+    // 3. Try Serper Google search (multiple query strategies)
     try {
       const username = await searchGitHubProfile(profile.full_name, dev.current_company, dev.linkedin_url);
       if (username) {
@@ -105,6 +107,7 @@ export async function POST(request: NextRequest) {
           .from("developers")
           .update({ github_url: githubUrl })
           .eq("id", dev.id);
+        console.log(`[Discovery] ${profile.full_name}: found via Serper → @${username}`);
         results.push({
           developerId: dev.id,
           name: profile.full_name,
@@ -128,6 +131,7 @@ export async function POST(request: NextRequest) {
             .from("developers")
             .update({ github_url: githubUrl })
             .eq("id", dev.id);
+          console.log(`[Discovery] ${profile.full_name}: found via website crawl → @${username}`);
           results.push({
             developerId: dev.id,
             name: profile.full_name,
@@ -151,6 +155,7 @@ export async function POST(request: NextRequest) {
           .from("developers")
           .update({ github_url: githubUrl })
           .eq("id", dev.id);
+        console.log(`[Discovery] ${profile.full_name}: found via website Google → @${username}`);
         results.push({
           developerId: dev.id,
           name: profile.full_name,
@@ -164,7 +169,8 @@ export async function POST(request: NextRequest) {
       console.error(`Website Google search failed for ${profile.full_name}:`, err);
     }
 
-    // 6. Not found — needs manual GitHub URL entry
+    // 6. Not found — needs manual GitHub URL entry or SixtyFour
+    console.log(`[Discovery] ${profile.full_name}: not found via any method`);
     results.push({
       developerId: dev.id,
       name: profile.full_name,

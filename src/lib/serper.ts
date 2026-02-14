@@ -51,11 +51,14 @@ function extractGitHubUsername(results: SerperResult[]): string | null {
 
 /**
  * Search Google for a GitHub profile matching the given name/company/LinkedIn.
- * Tries multiple query strategies, most precise first:
- *   1. Name + company (exact quotes)
- *   2. Name only (exact quotes)
+ * Tries many query strategies, most precise first:
+ *   1. Name + company (exact quotes, site:github.com)
+ *   2. Name only (exact quotes, site:github.com)
  *   3. LinkedIn slug on GitHub (if available)
  *   4. Name + company (no quotes, broader match)
+ *   5. Name only (no quotes, broader)
+ *   6. Name + "github.com" (no site: restriction — catches mentions on other sites)
+ *   7. Name + "github" (broadest — conference talks, portfolios, etc.)
  * Returns the GitHub username if found, or null.
  */
 export async function searchGitHubProfile(
@@ -88,6 +91,61 @@ export async function searchGitHubProfile(
   if (company) {
     const broadResult = await serperSearch(key, `site:github.com ${name} ${company}`);
     if (broadResult) return broadResult;
+  }
+
+  // 5. Name without quotes, no company — catches partial name matches
+  const broadNameResult = await serperSearch(key, `site:github.com ${name}`);
+  if (broadNameResult) return broadNameResult;
+
+  // 6. Search without site: restriction — finds GitHub links mentioned on portfolios, blogs, etc.
+  const mentionResult = await serperSearchForGitHubMention(key, `"${name}" "github.com"`);
+  if (mentionResult) return mentionResult;
+
+  // 7. Broadest: name + "github" keyword
+  if (company) {
+    const broadest = await serperSearchForGitHubMention(key, `"${name}" "${company}" github`);
+    if (broadest) return broadest;
+  }
+
+  return null;
+}
+
+/**
+ * Search Google for pages that mention a GitHub URL alongside the person's name.
+ * Unlike serperSearch, this doesn't use site:github.com — it finds GitHub links
+ * mentioned on blogs, portfolios, conference pages, etc.
+ */
+async function serperSearchForGitHubMention(key: string, q: string): Promise<string | null> {
+  const res = await fetch("https://google.serper.dev/search", {
+    method: "POST",
+    headers: {
+      "X-API-KEY": key,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ q, num: 10 }),
+  });
+
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const organic: SerperResult[] = data.organic ?? [];
+
+  // First check if any result IS a github.com URL
+  const directMatch = extractGitHubUsername(organic);
+  if (directMatch) return directMatch;
+
+  // Then scan result snippets and titles for GitHub URLs
+  const githubPattern = /github\.com\/([a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)/g;
+  for (const result of organic) {
+    const textToScan = `${result.title} ${result.snippet} ${result.link}`;
+    let match;
+    while ((match = githubPattern.exec(textToScan)) !== null) {
+      const username = match[1];
+      if (!RESERVED_PATHS.has(username.toLowerCase())) {
+        return username;
+      }
+    }
+    githubPattern.lastIndex = 0;
   }
 
   return null;
