@@ -83,15 +83,35 @@ export function DeveloperFilterPanel() {
         />
       </div>
 
-      {/* GitHub filter */}
-      <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
-        <Label className="text-xs whitespace-nowrap">Has GitHub</Label>
-        <Switch
-          checked={filters.has_github === true}
-          onCheckedChange={(checked) =>
-            updateParam("has_github", checked ? "true" : undefined)
-          }
-        />
+      {/* GitHub filter — 3 states: all / has / missing */}
+      <div className="flex items-center gap-1 rounded-md border px-3 py-1.5">
+        <Label className="text-xs whitespace-nowrap">GitHub:</Label>
+        <div className="flex gap-0.5">
+          <Button
+            size="sm"
+            variant={filters.has_github === undefined ? "default" : "ghost"}
+            className="h-6 px-2 text-xs"
+            onClick={() => updateParam("has_github", undefined)}
+          >
+            All
+          </Button>
+          <Button
+            size="sm"
+            variant={filters.has_github === true ? "default" : "ghost"}
+            className="h-6 px-2 text-xs"
+            onClick={() => updateParam("has_github", "true")}
+          >
+            Has
+          </Button>
+          <Button
+            size="sm"
+            variant={filters.has_github === false ? "default" : "ghost"}
+            className="h-6 px-2 text-xs"
+            onClick={() => updateParam("has_github", "false")}
+          >
+            Missing
+          </Button>
+        </div>
       </div>
 
       {/* Experience range */}
