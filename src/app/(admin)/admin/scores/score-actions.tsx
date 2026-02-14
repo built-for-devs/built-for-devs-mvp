@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MoreHorizontal, Eye, EyeOff, Trash2, RotateCcw } from "lucide-react";
+import { MoreHorizontal, Eye, EyeOff, Trash2, RotateCcw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -44,10 +44,17 @@ export function ScoreActions({
         body: JSON.stringify({ scoreId }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        console.error("Retry failed:", data.error);
+        let msg = "Retry failed";
+        try {
+          const data = await res.json();
+          msg = data.error ?? msg;
+        } catch { /* non-JSON response */ }
+        alert(`Retry failed: ${msg}`);
+        return;
       }
       router.refresh();
+    } catch (err) {
+      alert(`Retry failed: ${err instanceof Error ? err.message : "Network error"}`);
     } finally {
       setRetrying(false);
     }
@@ -57,8 +64,12 @@ export function ScoreActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <MoreHorizontal className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={retrying}>
+            {retrying ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <MoreHorizontal className="h-4 w-4" />
+            )}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -92,7 +103,10 @@ export function ScoreActions({
             </DropdownMenuItem>
           )}
           {status === "failed" && (
-            <DropdownMenuItem disabled={retrying} onClick={handleRetry}>
+            <DropdownMenuItem
+              disabled={retrying}
+              onSelect={() => handleRetry()}
+            >
               <RotateCcw className="mr-2 h-4 w-4" />
               {retrying ? "Retrying..." : "Retry"}
             </DropdownMenuItem>

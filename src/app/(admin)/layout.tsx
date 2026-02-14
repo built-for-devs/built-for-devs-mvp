@@ -9,7 +9,7 @@ import {
   ClipboardCheck,
   Building2,
   Gauge,
-  Sparkles,
+  Download,
   LogOut,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -22,7 +22,7 @@ const navItems: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Evaluations", href: "/admin/evaluations", icon: ClipboardCheck },
   { label: "Companies", href: "/admin/companies", icon: Building2 },
   { label: "Scores", href: "/admin/scores", icon: Gauge },
-  { label: "Enrichment", href: "/admin/enrichment", icon: Sparkles },
+  { label: "Import", href: "/admin/enrichment", icon: Download },
 ];
 
 export default function AdminLayout({

@@ -53,6 +53,7 @@ export type DeveloperFilters = {
   paid_tools?: string[];
   open_source_activity?: string[];
   is_available?: boolean;
+  sort?: "created_at" | "last_enriched_at";
   page?: number;
   per_page?: number;
 };

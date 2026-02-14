@@ -10,6 +10,7 @@ import { PaginationControls } from "@/components/admin/pagination-controls";
 import { Button } from "@/components/ui/button";
 import { Upload } from "lucide-react";
 import { DeveloperTable } from "./developer-table";
+import { CollectSixtyFourButton } from "./collect-sixtyfour-button";
 
 export default async function AdminDevelopersPage({
   searchParams,
@@ -24,9 +25,16 @@ export default async function AdminDevelopersPage({
     filters
   );
 
+  // Count pending SixtyFour tasks for the collect button
+  const { count: pendingSixtyFour } = await supabase
+    .from("developers")
+    .select("id", { count: "exact", head: true })
+    .not("sixtyfour_task_id", "is", null);
+
   return (
     <div>
       <PageHeader title="Developers" description={`${count} developer${count !== 1 ? "s" : ""} found`}>
+        <CollectSixtyFourButton pendingCount={pendingSixtyFour ?? 0} />
         <Link href="/admin/developers/import">
           <Button variant="outline" size="sm">
             <Upload className="mr-2 h-4 w-4" />

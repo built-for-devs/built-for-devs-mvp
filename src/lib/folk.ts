@@ -179,3 +179,119 @@ export function toContactView(
     enrichmentData,
   };
 }
+
+// ── Sync Back ─────────────────────────────────────────────────
+
+export interface FolkSyncData {
+  githubUrl?: string | null;
+  twitterUrl?: string | null;
+  websiteUrl?: string | null;
+  personalEmail?: string | null;
+  seniority?: string | null;
+  languages?: string | null;
+  roleType?: string | null;
+  yearsExperience?: number | null;
+  location?: string | null;
+  frameworks?: string | null;
+  databases?: string | null;
+  industries?: string | null;
+}
+
+/**
+ * Sync enriched developer data back to a Folk CRM contact.
+ * Updates both standard fields (urls) and custom fields in the group.
+ */
+export async function updateFolkPerson(
+  folkPersonId: string,
+  folkGroupId: string,
+  data: FolkSyncData
+): Promise<{ ok: boolean; error?: string }> {
+  const key = process.env.FOLK_API_KEY;
+  if (!key) return { ok: false, error: "FOLK_API_KEY not set" };
+
+  // Build custom fields for the group
+  const customFields: Record<string, unknown> = {};
+  if (data.seniority) customFields["Seniority level"] = data.seniority;
+  if (data.roleType) customFields["Role type"] = data.roleType;
+  if (data.languages) {
+    customFields["Primary programming languages"] = data.languages
+      .split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  if (data.frameworks) {
+    customFields["Frameworks"] = data.frameworks
+      .split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  if (data.databases) {
+    customFields["Databases"] = data.databases
+      .split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  if (data.industries) {
+    customFields["Industries"] = data.industries
+      .split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  if (data.yearsExperience) {
+    customFields["Years of professional experience"] = data.yearsExperience;
+  }
+  if (data.location) customFields["Location"] = data.location;
+
+  // Build the PATCH body
+  // Note: urls replaces the entire array, so we first fetch existing urls to merge
+  const body: Record<string, unknown> = {};
+
+  if (Object.keys(customFields).length > 0) {
+    body.customFieldValues = { [folkGroupId]: customFields };
+  }
+
+  // Collect new URLs and emails to merge
+  const newUrls: string[] = [];
+  if (data.githubUrl) newUrls.push(data.githubUrl);
+  if (data.twitterUrl) newUrls.push(data.twitterUrl);
+  if (data.websiteUrl) newUrls.push(data.websiteUrl);
+
+  // Folk PATCH replaces list fields entirely, so fetch existing to merge
+  if (newUrls.length > 0 || data.personalEmail) {
+    try {
+      const getRes = await fetch(`${FOLK_BASE}/people/${folkPersonId}`, {
+        headers: folkHeaders(),
+      });
+      if (getRes.ok) {
+        const person = await getRes.json();
+        if (newUrls.length > 0) {
+          const existingUrls: string[] = person.data?.urls ?? [];
+          body.urls = [...new Set([...existingUrls, ...newUrls])];
+        }
+        if (data.personalEmail) {
+          const existingEmails: string[] = person.data?.emails ?? [];
+          if (!existingEmails.includes(data.personalEmail)) {
+            body.emails = [...existingEmails, data.personalEmail];
+          }
+        }
+      } else if (newUrls.length > 0) {
+        body.urls = newUrls;
+      }
+    } catch {
+      if (newUrls.length > 0) body.urls = newUrls;
+    }
+  }
+
+  if (Object.keys(body).length === 0) {
+    return { ok: true };
+  }
+
+  const res = await fetch(`${FOLK_BASE}/people/${folkPersonId}`, {
+    method: "PATCH",
+    headers: folkHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    if (res.status === 422 && text.includes("does not exist in group")) {
+      console.warn(`Folk sync-back: custom fields missing in group ${folkGroupId} — skipping`);
+      return { ok: false, error: "Folk group missing custom fields" };
+    }
+    return { ok: false, error: `Folk PATCH failed (${res.status}): ${text}` };
+  }
+
+  return { ok: true };
+}

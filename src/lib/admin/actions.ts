@@ -7,6 +7,7 @@ import { sendEmail, getAppUrl } from "@/lib/email";
 import { InvitationEmail } from "@/lib/email/templates/invitation";
 import { PaymentSentEmail } from "@/lib/email/templates/payment-sent";
 import { CompanyReportReadyEmail } from "@/lib/email/templates/company-report-ready";
+import { logDeveloperActivity } from "@/lib/admin/activity-log";
 import type { Enums } from "@/types/database";
 
 function createServiceClient() {
@@ -42,6 +43,10 @@ export async function updateDeveloperNotes(
     .eq("id", developerId);
 
   if (error) return { success: false, error: error.message };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  logDeveloperActivity(supabase, developerId, user?.id ?? null, "updated_notes");
+
   revalidatePath("/admin/developers");
   return { success: true };
 }
@@ -57,6 +62,12 @@ export async function updateDeveloperAvailability(
     .eq("id", developerId);
 
   if (error) return { success: false, error: error.message };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  logDeveloperActivity(supabase, developerId, user?.id ?? null, "updated_availability", {
+    is_available: isAvailable,
+  });
+
   revalidatePath("/admin/developers");
   return { success: true };
 }
@@ -72,6 +83,12 @@ export async function updateDeveloperQualityRating(
     .eq("id", developerId);
 
   if (error) return { success: false, error: error.message };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  logDeveloperActivity(supabase, developerId, user?.id ?? null, "updated_quality_rating", {
+    rating,
+  });
+
   revalidatePath("/admin/developers");
   return { success: true };
 }
@@ -87,6 +104,12 @@ export async function updateDeveloperProfile(
     .eq("id", developerId);
 
   if (error) return { success: false, error: error.message };
+
+  const { data: { user } } = await supabase.auth.getUser();
+  logDeveloperActivity(supabase, developerId, user?.id ?? null, "edited_profile", {
+    fields: Object.keys(data),
+  });
+
   revalidatePath(`/admin/developers/${developerId}`);
   revalidatePath("/admin/developers");
   return { success: true };
@@ -706,6 +729,8 @@ export async function importDevelopers(
 // ============================================================
 
 export interface FolkImportContact {
+  folk_person_id?: string;
+  folk_group_id?: string;
   email: string;
   full_name: string;
   job_title?: string;
@@ -720,14 +745,16 @@ export interface FolkImportContact {
 
 export async function importFromFolk(
   contacts: FolkImportContact[]
-): Promise<{ success: boolean; imported: number; skipped: number; errors: string[] }> {
+): Promise<{ success: boolean; imported: number; skipped: number; errors: string[]; developerIds: string[]; developerNames: Record<string, string> }> {
   const authErr = await requireAdmin();
-  if (authErr) return { success: false, imported: 0, skipped: 0, errors: [authErr.error ?? "Unauthorized"] };
+  if (authErr) return { success: false, imported: 0, skipped: 0, errors: [authErr.error ?? "Unauthorized"], developerIds: [], developerNames: {} };
 
   const supabase = createServiceClient();
   let imported = 0;
   let skipped = 0;
   const errors: string[] = [];
+  const developerIds: string[] = [];
+  const developerNames: Record<string, string> = {};
 
   for (const contact of contacts) {
     // Check for duplicate email
@@ -769,6 +796,9 @@ export async function importFromFolk(
       import_source: "folk",
     };
 
+    if (contact.folk_person_id) devFields.folk_person_id = contact.folk_person_id;
+    if (contact.folk_group_id) devFields.folk_group_id = contact.folk_group_id;
+
     if (contact.job_title) devFields.job_title = contact.job_title;
     if (contact.current_company) devFields.current_company = contact.current_company;
     if (contact.linkedin_url) devFields.linkedin_url = contact.linkedin_url;
@@ -790,13 +820,15 @@ export async function importFromFolk(
         .from("developers")
         .update(devFields)
         .eq("id", devRecord.id);
+      developerIds.push(devRecord.id);
+      developerNames[devRecord.id] = contact.full_name;
     }
 
     imported++;
   }
 
   revalidatePath("/admin/developers");
-  return { success: true, imported, skipped, errors };
+  return { success: true, imported, skipped, errors, developerIds, developerNames };
 }
 
 // ============================================================

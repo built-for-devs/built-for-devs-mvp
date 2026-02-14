@@ -108,6 +108,8 @@ export type Database = {
           current_company: string | null
           databases: string[] | null
           devops_tools: string[] | null
+          folk_group_id: string | null
+          folk_person_id: string | null
           frameworks: string[] | null
           github_url: string | null
           id: string
@@ -117,7 +119,9 @@ export type Database = {
           is_available: boolean
           job_title: string | null
           languages: string[] | null
+          last_enriched_at: string | null
           linkedin_url: string | null
+          sixtyfour_task_id: string | null
           open_source_activity:
             | Database["public"]["Enums"]["oss_activity"]
             | null
@@ -125,6 +129,7 @@ export type Database = {
           other_links: string[] | null
           paid_tools: string[] | null
           paypal_email: string | null
+          personal_email: string | null
           preferred_eval_times: string[] | null
           profile_complete: boolean
           profile_id: string
@@ -157,6 +162,8 @@ export type Database = {
           current_company?: string | null
           databases?: string[] | null
           devops_tools?: string[] | null
+          folk_group_id?: string | null
+          folk_person_id?: string | null
           frameworks?: string[] | null
           github_url?: string | null
           id?: string
@@ -166,7 +173,9 @@ export type Database = {
           is_available?: boolean
           job_title?: string | null
           languages?: string[] | null
+          last_enriched_at?: string | null
           linkedin_url?: string | null
+          sixtyfour_task_id?: string | null
           open_source_activity?:
             | Database["public"]["Enums"]["oss_activity"]
             | null
@@ -174,6 +183,7 @@ export type Database = {
           other_links?: string[] | null
           paid_tools?: string[] | null
           paypal_email?: string | null
+          personal_email?: string | null
           preferred_eval_times?: string[] | null
           profile_complete?: boolean
           profile_id: string
@@ -206,6 +216,8 @@ export type Database = {
           current_company?: string | null
           databases?: string[] | null
           devops_tools?: string[] | null
+          folk_group_id?: string | null
+          folk_person_id?: string | null
           frameworks?: string[] | null
           github_url?: string | null
           id?: string
@@ -215,7 +227,9 @@ export type Database = {
           is_available?: boolean
           job_title?: string | null
           languages?: string[] | null
+          last_enriched_at?: string | null
           linkedin_url?: string | null
+          sixtyfour_task_id?: string | null
           open_source_activity?:
             | Database["public"]["Enums"]["oss_activity"]
             | null
@@ -223,6 +237,7 @@ export type Database = {
           other_links?: string[] | null
           paid_tools?: string[] | null
           paypal_email?: string | null
+          personal_email?: string | null
           preferred_eval_times?: string[] | null
           profile_complete?: boolean
           profile_id?: string

@@ -18,8 +18,8 @@ export default async function AdminEnrichmentPage({
   return (
     <div>
       <PageHeader
-        title="Enrichment"
-        description="Enrich Folk CRM contacts with LinkedIn data and import into BFD"
+        title="Import from Folk"
+        description="Import contacts from Folk CRM as developers in BFD"
       />
 
       <div className="space-y-4">

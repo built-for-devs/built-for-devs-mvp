@@ -48,6 +48,7 @@ interface DeveloperRowData {
   is_available: boolean;
   total_evaluations: number;
   linkedin_url: string | null;
+  last_enriched_at: string | null;
   profiles: { full_name: string; email: string };
 }
 
@@ -234,6 +235,13 @@ export function DeveloperRowEditor({
         >
           {dev.is_available ? "Yes" : "No"}
         </Badge>
+      </TableCell>
+
+      {/* Enriched */}
+      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+        {dev.last_enriched_at
+          ? new Date(dev.last_enriched_at).toLocaleDateString()
+          : "—"}
       </TableCell>
 
       {/* Evals + Edit button */}
