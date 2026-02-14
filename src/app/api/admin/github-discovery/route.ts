@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { findGitHubUser, type EnrichmentInput } from "@/lib/enrichment";
-import { searchGitHubProfile } from "@/lib/serper";
+import { searchGitHubProfile, crawlForGitHub, findGitHubViaWebsite } from "@/lib/serper";
 import { submitGitHubDiscovery } from "@/lib/sixtyfour";
 
 export const maxDuration = 60;
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
   const { data: developers, error: fetchError } = await serviceClient
     .from("developers")
-    .select("id, github_url, linkedin_url, job_title, current_company, city, profiles!inner(full_name, email)")
+    .select("id, github_url, linkedin_url, website_url, job_title, current_company, city, profiles!inner(full_name, email)")
     .in("id", developerIds);
 
   if (fetchError || !developers) {
@@ -119,7 +119,53 @@ export async function POST(request: NextRequest) {
       console.error(`Serper search failed for ${profile.full_name}:`, err);
     }
 
-    // 4. Try SixtyFour (async) if developer has LinkedIn
+    // 4. Crawl existing website_url for GitHub links
+    if (dev.website_url) {
+      try {
+        const username = await crawlForGitHub(dev.website_url);
+        if (username) {
+          const githubUrl = `https://github.com/${username}`;
+          await serviceClient
+            .from("developers")
+            .update({ github_url: githubUrl })
+            .eq("id", dev.id);
+          results.push({
+            developerId: dev.id,
+            name: profile.full_name,
+            status: "found",
+            githubUrl,
+            source: "website_crawl",
+          });
+          continue;
+        }
+      } catch (err) {
+        console.error(`Website crawl failed for ${profile.full_name}:`, err);
+      }
+    }
+
+    // 5. Google for their website, then crawl it for GitHub links
+    try {
+      const username = await findGitHubViaWebsite(profile.full_name, dev.current_company);
+      if (username) {
+        const githubUrl = `https://github.com/${username}`;
+        await serviceClient
+          .from("developers")
+          .update({ github_url: githubUrl })
+          .eq("id", dev.id);
+        results.push({
+          developerId: dev.id,
+          name: profile.full_name,
+          status: "found",
+          githubUrl,
+          source: "website_google",
+        });
+        continue;
+      }
+    } catch (err) {
+      console.error(`Website Google search failed for ${profile.full_name}:`, err);
+    }
+
+    // 6. Try SixtyFour (async) if developer has LinkedIn — expensive, last resort
     if (dev.linkedin_url) {
       try {
         const taskId = await submitGitHubDiscovery({
@@ -152,7 +198,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. No LinkedIn — needs manual GitHub URL
+    // 7. No LinkedIn — needs manual GitHub URL
     results.push({
       developerId: dev.id,
       name: profile.full_name,

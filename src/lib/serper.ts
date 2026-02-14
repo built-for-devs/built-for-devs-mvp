@@ -93,6 +93,95 @@ export async function searchGitHubProfile(
   return null;
 }
 
+/**
+ * Extract a GitHub username from HTML by scanning for github.com links.
+ */
+function extractGitHubFromHtml(html: string): string | null {
+  const githubPattern = /https?:\/\/(?:www\.)?github\.com\/([a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)(?:["'\s/?>])/g;
+
+  let match;
+  while ((match = githubPattern.exec(html)) !== null) {
+    const username = match[1];
+    if (!RESERVED_PATHS.has(username.toLowerCase())) {
+      return username;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Crawl a URL and scan the page for GitHub profile links.
+ * Returns the GitHub username if found, or null.
+ */
+export async function crawlForGitHub(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "BFD-Bot/1.0" },
+      signal: AbortSignal.timeout(5000),
+      redirect: "follow",
+    });
+    if (!res.ok) return null;
+
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!contentType.includes("text/html")) return null;
+
+    const html = await res.text();
+    return extractGitHubFromHtml(html.slice(0, 100_000));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Google for a person's website, then crawl it looking for GitHub links.
+ * Skips social media sites (LinkedIn, Twitter, Facebook) since those
+ * won't have GitHub links in their HTML.
+ * Returns the GitHub username if found, or null.
+ */
+export async function findGitHubViaWebsite(
+  name: string,
+  company?: string | null
+): Promise<string | null> {
+  const key = getApiKey();
+  const q = company ? `"${name}" "${company}"` : `"${name}" developer`;
+
+  const res = await fetch("https://google.serper.dev/search", {
+    method: "POST",
+    headers: {
+      "X-API-KEY": key,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ q, num: 5 }),
+  });
+
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const organic: SerperResult[] = data.organic ?? [];
+
+  // Skip social media / large platforms — we only want personal sites
+  const skipDomains = [
+    "linkedin.com", "twitter.com", "x.com", "facebook.com",
+    "github.com", "medium.com", "youtube.com", "reddit.com",
+    "stackoverflow.com", "crunchbase.com", "bloomberg.com",
+  ];
+
+  for (const result of organic) {
+    try {
+      const domain = new URL(result.link).hostname.replace(/^www\./, "");
+      if (skipDomains.some((d) => domain === d || domain.endsWith(`.${d}`))) continue;
+
+      const username = await crawlForGitHub(result.link);
+      if (username) return username;
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 async function serperSearch(key: string, q: string): Promise<string | null> {
   const res = await fetch("https://google.serper.dev/search", {
     method: "POST",
