@@ -213,7 +213,8 @@ export function ContactTable({ groupId }: { groupId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ personIds: ids, groupId }),
       });
-      if (res.ok) {
+      const data = await res.json();
+      if (res.ok && data.removed > 0) {
         setContacts((prev) => prev.filter((c) => !ids.includes(c.id)));
         setSelected((prev) => {
           const next = new Set(prev);
@@ -221,8 +222,12 @@ export function ContactTable({ groupId }: { groupId: string }) {
           return next;
         });
       }
+      if (data.errors?.length) {
+        console.error("Remove from group errors:", data.errors);
+        setError(`Failed to remove some contacts: ${data.errors.join(", ")}`);
+      }
     } catch {
-      // silently skip failures
+      setError("Failed to remove contacts from group");
     }
     setDeleting((prev) => {
       const next = new Set(prev);

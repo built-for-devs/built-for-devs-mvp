@@ -37,22 +37,31 @@ export async function POST(request: NextRequest) {
         headers: { Authorization: `Bearer ${key}` },
       });
       if (!getRes.ok) {
-        errors.push(`${personId}: failed to fetch`);
+        const text = await getRes.text();
+        console.error(`[RemoveFromGroup] GET failed for ${personId}: ${getRes.status} ${text}`);
+        errors.push(`${personId}: failed to fetch (${getRes.status})`);
         continue;
       }
       const person = await getRes.json();
-      const currentGroups: { id: string }[] = (person.data?.groups ?? []).map(
+      const rawGroups = person.data?.groups ?? [];
+      const currentGroups: { id: string }[] = rawGroups.map(
         (g: { id: string }) => ({ id: g.id })
       );
+
+      console.log(`[RemoveFromGroup] ${personId}: current groups =`, JSON.stringify(currentGroups.map((g: { id: string }) => g.id)));
+      console.log(`[RemoveFromGroup] ${personId}: removing groupId = ${groupId}`);
 
       // Filter out the target group
       const updatedGroups = currentGroups.filter((g) => g.id !== groupId);
 
       if (updatedGroups.length === currentGroups.length) {
-        // Wasn't in the group — count as success
+        console.log(`[RemoveFromGroup] ${personId}: group not found in current groups, skipping`);
         removed++;
         continue;
       }
+
+      const patchBody = { groups: updatedGroups };
+      console.log(`[RemoveFromGroup] ${personId}: PATCH body =`, JSON.stringify(patchBody));
 
       const patchRes = await fetch(`${FOLK_BASE}/people/${personId}`, {
         method: "PATCH",
@@ -60,17 +69,21 @@ export async function POST(request: NextRequest) {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ groups: updatedGroups }),
+        body: JSON.stringify(patchBody),
       });
 
       if (!patchRes.ok) {
         const text = await patchRes.text();
-        errors.push(`${personId}: ${text}`);
+        console.error(`[RemoveFromGroup] PATCH failed for ${personId}: ${patchRes.status} ${text}`);
+        errors.push(`${personId}: PATCH failed (${patchRes.status}): ${text}`);
         continue;
       }
 
+      const patchData = await patchRes.json();
+      console.log(`[RemoveFromGroup] ${personId}: PATCH success, response groups =`, JSON.stringify((patchData.data?.groups ?? []).map((g: { id: string }) => g.id)));
       removed++;
     } catch (err) {
+      console.error(`[RemoveFromGroup] Exception for ${personId}:`, err);
       errors.push(
         `${personId}: ${err instanceof Error ? err.message : "unknown error"}`
       );
