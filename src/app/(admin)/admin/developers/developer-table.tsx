@@ -35,6 +35,7 @@ interface DeveloperRowData {
   is_available: boolean;
   total_evaluations: number;
   linkedin_url: string | null;
+  github_url: string | null;
   last_enriched_at: string | null;
   profiles: { full_name: string; email: string };
 }

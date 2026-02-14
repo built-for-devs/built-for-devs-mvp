@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Pencil, Check, ChevronsUpDown, Linkedin } from "lucide-react";
+import { Pencil, Check, ChevronsUpDown, Linkedin, Github } from "lucide-react";
 import { updateDeveloperProfile } from "@/lib/admin/actions";
 import {
   roleTypeOptions,
@@ -48,6 +48,7 @@ interface DeveloperRowData {
   is_available: boolean;
   total_evaluations: number;
   linkedin_url: string | null;
+  github_url: string | null;
   last_enriched_at: string | null;
   profiles: { full_name: string; email: string };
 }
@@ -107,18 +108,30 @@ export function DeveloperRowEditor({
         <p className="text-xs text-muted-foreground">{dev.profiles.email}</p>
       </TableCell>
 
-      {/* LinkedIn */}
+      {/* Social Links */}
       <TableCell>
-        {dev.linkedin_url ? (
-          <a
-            href={dev.linkedin_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <Linkedin className="h-4 w-4" />
-          </a>
-        ) : null}
+        <div className="flex items-center gap-1.5">
+          {dev.linkedin_url && (
+            <a
+              href={dev.linkedin_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Linkedin className="h-4 w-4" />
+            </a>
+          )}
+          {dev.github_url && (
+            <a
+              href={dev.github_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+          )}
+        </div>
       </TableCell>
 
       {/* Job Title */}
