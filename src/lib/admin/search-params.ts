@@ -54,6 +54,7 @@ export function parseDeveloperFilters(
     open_source_activity: parseArray(get("open_source_activity")),
     is_available: parseBool(get("is_available")),
     has_github: parseBool(get("has_github")),
+    has_linkedin: parseBool(get("has_linkedin")),
     sort: get("sort") === "last_enriched_at" ? "last_enriched_at" : undefined,
     page: parseIntParam(get("page")) ?? 1,
     per_page: parseIntParam(get("per_page")) ?? ITEMS_PER_PAGE,

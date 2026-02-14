@@ -181,6 +181,11 @@ export async function getDevelopersWithProfiles(
   } else if (filters.has_github === false) {
     query = query.is("github_url", null);
   }
+  if (filters.has_linkedin === true) {
+    query = query.not("linkedin_url", "is", null);
+  } else if (filters.has_linkedin === false) {
+    query = query.is("linkedin_url", null);
+  }
 
   // Enum filters — cast through `any` because filter values arrive as plain strings
   // from URL search params but Supabase expects the narrow enum literal types

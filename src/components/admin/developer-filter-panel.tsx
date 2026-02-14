@@ -114,6 +114,37 @@ export function DeveloperFilterPanel() {
         </div>
       </div>
 
+      {/* LinkedIn filter — 3 states: all / has / missing */}
+      <div className="flex items-center gap-1 rounded-md border px-3 py-1.5">
+        <Label className="text-xs whitespace-nowrap">LinkedIn:</Label>
+        <div className="flex gap-0.5">
+          <Button
+            size="sm"
+            variant={filters.has_linkedin === undefined ? "default" : "ghost"}
+            className="h-6 px-2 text-xs"
+            onClick={() => updateParam("has_linkedin", undefined)}
+          >
+            All
+          </Button>
+          <Button
+            size="sm"
+            variant={filters.has_linkedin === true ? "default" : "ghost"}
+            className="h-6 px-2 text-xs"
+            onClick={() => updateParam("has_linkedin", "true")}
+          >
+            Has
+          </Button>
+          <Button
+            size="sm"
+            variant={filters.has_linkedin === false ? "default" : "ghost"}
+            className="h-6 px-2 text-xs"
+            onClick={() => updateParam("has_linkedin", "false")}
+          >
+            Missing
+          </Button>
+        </div>
+      </div>
+
       {/* Experience range */}
       <div className="flex items-center gap-1 rounded-md border px-3 py-1.5">
         <Label className="text-xs whitespace-nowrap">Exp:</Label>

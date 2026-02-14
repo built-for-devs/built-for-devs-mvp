@@ -54,6 +54,7 @@ export type DeveloperFilters = {
   open_source_activity?: string[];
   is_available?: boolean;
   has_github?: boolean;
+  has_linkedin?: boolean;
   sort?: "created_at" | "last_enriched_at";
   page?: number;
   per_page?: number;
