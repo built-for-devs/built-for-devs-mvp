@@ -228,6 +228,9 @@ export async function getDevelopersWithProfiles(
   }
 
   // Pagination and ordering
+  if (filters.sort === "last_enriched_at") {
+    query = query.order("last_enriched_at", { ascending: true, nullsFirst: true });
+  }
   query = query.order("created_at", { ascending: false }).range(from, to);
 
   const { data, count, error } = await query;
@@ -258,9 +261,23 @@ export async function getDeveloperById(supabase: Client, id: string) {
     .eq("developer_id", id)
     .order("created_at", { ascending: false });
 
+  const { data: activityLogs } = await (supabase as any)
+    .from("developer_activity_logs")
+    .select("*, profiles(full_name)")
+    .eq("developer_id", id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
   return {
     developer: developer as unknown as DeveloperWithProfile,
     evaluations: evaluations ?? [],
+    activityLogs: (activityLogs ?? []) as {
+      id: string;
+      action: string;
+      details: Record<string, unknown>;
+      created_at: string;
+      profiles: { full_name: string } | null;
+    }[],
   };
 }
 

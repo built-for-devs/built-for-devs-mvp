@@ -1,7 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  CheckCircle,
+  XCircle,
+  Loader2,
+  AlertCircle,
+  Upload,
+  Sparkles,
+  Clock,
+  Github,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,6 +32,8 @@ import {
 import { importFromFolk } from "@/lib/admin/actions";
 import type { FolkImportContact } from "@/lib/admin/actions";
 
+type Phase = "confirm" | "importing" | "discovering" | "enriching" | "complete";
+
 interface ContactView {
   id: string;
   fullName: string | null;
@@ -35,34 +47,77 @@ interface ContactView {
   enrichmentData: Record<string, string | null>;
 }
 
+interface DiscoveryItem {
+  developerId: string;
+  name: string;
+  status: "searching" | "found" | "submitted" | "no_linkedin" | "already_has_github" | "failed";
+  githubUrl?: string;
+  taskId?: string;
+  source?: string;
+}
+
+interface EnrichItem {
+  developerId: string;
+  name: string;
+  status: "enriched" | "partial" | "failed";
+  fieldsUpdated?: number;
+}
+
 interface ImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contacts: ContactView[];
+  folkGroupId: string;
 }
 
 export function ImportDialog({
   open,
   onOpenChange,
   contacts,
+  folkGroupId,
 }: ImportDialogProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [result, setResult] = useState<{
+  const [phase, setPhase] = useState<Phase>("confirm");
+  const [importResult, setImportResult] = useState<{
     imported: number;
     skipped: number;
     errors: string[];
+    developerIds: string[];
   } | null>(null);
+  const [developerNames, setDeveloperNames] = useState<Record<string, string>>({});
+  const [discoveryItems, setDiscoveryItems] = useState<DiscoveryItem[]>([]);
+  const [enrichItems, setEnrichItems] = useState<EnrichItem[]>([]);
 
-  function handleImport() {
+  function handleClose() {
+    onOpenChange(false);
+    if (phase === "complete" || phase === "enriching" || phase === "discovering") {
+      router.refresh();
+    }
+    setTimeout(() => {
+      setPhase("confirm");
+      setImportResult(null);
+      setDeveloperNames({});
+      setDiscoveryItems([]);
+      setEnrichItems([]);
+    }, 200);
+  }
+
+  function contactName(c: ContactView): string {
+    return c.fullName ?? (`${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || c.email!);
+  }
+
+  // ── Phase 1: Import ──
+
+  async function startImport() {
+    setPhase("importing");
+
     const mapped: FolkImportContact[] = contacts
       .filter((c) => c.email)
       .map((c) => ({
+        folk_person_id: c.id,
+        folk_group_id: folkGroupId,
         email: c.email!,
-        full_name:
-          c.fullName ??
-          (`${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() ||
-          c.email!),
+        full_name: contactName(c),
         job_title: c.jobTitle ?? undefined,
         current_company: c.company ?? undefined,
         linkedin_url: c.linkedinUrl ?? undefined,
@@ -79,33 +134,142 @@ export function ImportDialog({
           : undefined,
       }));
 
-    startTransition(async () => {
+    try {
       const res = await importFromFolk(mapped);
-      setResult({ imported: res.imported, skipped: res.skipped, errors: res.errors });
-    });
+      setImportResult(res);
+
+      if (res.developerIds.length > 0) {
+        const names = res.developerNames;
+        setDeveloperNames(names);
+        startDiscovery(res.developerIds, names);
+      } else {
+        setPhase("complete");
+      }
+    } catch {
+      setImportResult({
+        imported: 0,
+        skipped: 0,
+        errors: ["Import failed unexpectedly"],
+        developerIds: [],
+      });
+      setPhase("complete");
+    }
   }
 
-  function handleClose() {
-    onOpenChange(false);
-    if (result && result.imported > 0) {
-      router.refresh();
+  // ── Phase 2: GitHub Discovery ──
+
+  async function startDiscovery(devIds: string[], names: Record<string, string>) {
+    setPhase("discovering");
+    setDiscoveryItems(
+      devIds.map((id) => ({
+        developerId: id,
+        name: names[id] ?? "Unknown",
+        status: "searching",
+      }))
+    );
+
+    try {
+      const res = await fetch("/api/admin/github-discovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ developerIds: devIds }),
+      });
+
+      if (!res.ok) throw new Error("Discovery request failed");
+      const data = await res.json();
+
+      const items: DiscoveryItem[] = data.results.map((r: DiscoveryItem) => ({
+        developerId: r.developerId,
+        name: r.name,
+        status: r.status === "submitted" ? "submitted" : r.status,
+        githubUrl: r.githubUrl,
+        taskId: r.taskId,
+        source: r.source,
+      }));
+
+      setDiscoveryItems(items);
+
+      // Don't poll SixtyFour — proceed to enrichment immediately.
+      // SixtyFour results are collected later via "Collect Results" on Developers page.
+      startEnrichment(devIds, names);
+    } catch {
+      setDiscoveryItems((prev) =>
+        prev.map((i) => ({ ...i, status: "failed" as const }))
+      );
+      startEnrichment(devIds, names);
     }
-    setResult(null);
   }
+
+  // ── Phase 3: Enrichment ──
+
+  async function startEnrichment(devIds: string[], names: Record<string, string>) {
+    setPhase("enriching");
+    setEnrichItems(
+      devIds.map((id) => ({
+        developerId: id,
+        name: names[id] ?? "Unknown",
+        status: "enriched" as const,
+      }))
+    );
+
+    try {
+      const res = await fetch("/api/admin/re-enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ developerIds: devIds }),
+      });
+
+      if (!res.ok) throw new Error("Enrichment failed");
+      const data = await res.json();
+
+      const items: EnrichItem[] = data.results.map(
+        (r: { id: string; name: string; status: string; data?: Record<string, unknown> }) => ({
+          developerId: r.id,
+          name: r.name,
+          status: r.status === "failed" ? "failed" : r.status === "partial" ? "partial" : "enriched",
+          fieldsUpdated: r.data ? Object.keys(r.data).filter((k) => r.data![k] != null).length : 0,
+        })
+      );
+
+      setEnrichItems(items);
+      setPhase("complete");
+    } catch {
+      setEnrichItems((prev) =>
+        prev.map((i) => ({ ...i, status: "failed" as const }))
+      );
+      setPhase("complete");
+    }
+  }
+
+  // ── Counts ──
+
+  const discoveryFound = discoveryItems.filter(
+    (i) => i.status === "found" || i.status === "already_has_github"
+  ).length;
+  const sixtyfourPending = discoveryItems.filter((i) => i.status === "submitted").length;
+  const enrichedCount = enrichItems.filter((i) => i.status === "enriched").length;
+  const partialCount = enrichItems.filter((i) => i.status === "partial").length;
+  const failedCount = enrichItems.filter((i) => i.status === "failed").length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Import to Built for Devs</DialogTitle>
+          <DialogTitle>
+            {phase === "confirm" && `Import & Enrich ${contacts.length} Contact${contacts.length !== 1 ? "s" : ""}`}
+            {phase === "importing" && "Importing Contacts..."}
+            {phase === "discovering" && "Finding GitHub Profiles..."}
+            {phase === "enriching" && "Enriching Profiles..."}
+            {phase === "complete" && "Import Complete"}
+          </DialogTitle>
         </DialogHeader>
 
-        {!result ? (
+        {/* ── Confirm Phase ── */}
+        {phase === "confirm" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Import {contacts.length} enriched contact
-              {contacts.length !== 1 ? "s" : ""} as developer users in BFD.
-              Existing emails will be skipped.
+              This will import {contacts.length} contact{contacts.length !== 1 ? "s" : ""} as
+              developers, find their GitHub profiles, and enrich with AI.
             </p>
 
             <div className="max-h-64 overflow-auto rounded-md border">
@@ -114,30 +278,20 @@ export function ImportDialog({
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Seniority</TableHead>
-                    <TableHead>Role</TableHead>
+                    <TableHead>Company</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {contacts.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="text-sm font-medium">
-                        {c.fullName ??
-                          (`${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() ||
-                          "—")}
+                        {contactName(c)}
                       </TableCell>
                       <TableCell className="text-sm">
                         {c.email ?? "—"}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {c.enrichmentData["Location"] ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {c.enrichmentData["Seniority level"] ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {c.enrichmentData["Role type"] ?? "—"}
+                        {c.company ?? "—"}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -145,38 +299,209 @@ export function ImportDialog({
               </Table>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="sm:justify-between">
               <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button onClick={handleImport} disabled={isPending}>
-                {isPending ? "Importing..." : `Import ${contacts.length}`}
+              <Button onClick={startImport}>
+                <Upload className="mr-1.5 h-4 w-4" />
+                Import & Enrich
               </Button>
             </DialogFooter>
           </div>
-        ) : (
+        )}
+
+        {/* ── Importing Phase ── */}
+        {phase === "importing" && (
           <div className="space-y-4">
-            <div className="flex gap-3">
-              <Badge className="bg-green-100 text-green-800 border-transparent">
-                {result.imported} imported
-              </Badge>
-              {result.skipped > 0 && (
-                <Badge variant="outline">
-                  {result.skipped} skipped (already exist)
-                </Badge>
-              )}
-              {result.errors.length > 0 && (
-                <Badge className="bg-red-100 text-red-800 border-transparent">
-                  {result.errors.length} error{result.errors.length !== 1 ? "s" : ""}
-                </Badge>
-              )}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Step 1/3: Creating developer accounts...
             </div>
 
-            {result.errors.length > 0 && (
-              <div className="max-h-32 overflow-auto rounded-md bg-destructive/10 p-3 text-xs text-destructive">
-                {result.errors.map((e, i) => (
+            <div className="max-h-48 overflow-auto rounded-md bg-muted p-3 text-sm">
+              {contacts.map((c, i) => (
+                <div key={c.id} className="flex items-center gap-2 py-0.5">
+                  <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                  {i + 1}. {contactName(c)}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Discovery Phase ── */}
+        {phase === "discovering" && (
+          <div className="space-y-4">
+            {importResult && importResult.imported > 0 && (
+              <div className="flex gap-2 text-sm">
+                <Badge className="bg-green-100 text-green-800 border-transparent">
+                  {importResult.imported} imported
+                </Badge>
+                {importResult.skipped > 0 && (
+                  <Badge variant="outline">{importResult.skipped} skipped</Badge>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Step 2/3: Finding GitHub profiles...
+            </div>
+
+            <div className="max-h-64 overflow-auto space-y-1.5">
+              {discoveryItems.map((item) => (
+                <div
+                  key={item.developerId}
+                  className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                >
+                  <span>{item.name}</span>
+                  <DiscoveryStatus item={item} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Enriching Phase ── */}
+        {phase === "enriching" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Step 3/3: Enriching profiles with GitHub + AI...
+            </div>
+
+            <div className="max-h-48 overflow-auto rounded-md bg-muted p-3 text-sm">
+              {enrichItems.map((item, i) => (
+                <div key={item.developerId} className="flex items-center gap-2 py-0.5">
+                  <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+                  {i + 1}. {item.name}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Complete Phase ── */}
+        {phase === "complete" && (
+          <div className="space-y-4">
+            {/* Import summary */}
+            {importResult && (
+              <div className="flex flex-wrap gap-2 text-sm">
+                <span className="flex items-center gap-1 font-medium">
+                  <Upload className="h-4 w-4" /> Import:
+                </span>
+                {importResult.imported > 0 && (
+                  <Badge className="bg-green-100 text-green-800 border-transparent">
+                    {importResult.imported} imported
+                  </Badge>
+                )}
+                {importResult.skipped > 0 && (
+                  <Badge variant="outline">{importResult.skipped} skipped</Badge>
+                )}
+                {importResult.errors.length > 0 && (
+                  <Badge className="bg-red-100 text-red-800 border-transparent">
+                    {importResult.errors.length} error{importResult.errors.length !== 1 ? "s" : ""}
+                  </Badge>
+                )}
+              </div>
+            )}
+
+            {importResult?.errors && importResult.errors.length > 0 && (
+              <div className="max-h-24 overflow-auto rounded-md bg-destructive/10 p-3 text-xs text-destructive">
+                {importResult.errors.map((e, i) => (
                   <p key={i}>{e}</p>
                 ))}
+              </div>
+            )}
+
+            {/* GitHub discovery summary */}
+            {discoveryItems.length > 0 && (
+              <div className="flex flex-wrap gap-3 text-sm">
+                <span className="flex items-center gap-1 font-medium">
+                  <Github className="h-4 w-4" /> GitHub:
+                </span>
+                {discoveryFound > 0 && (
+                  <span className="text-green-700">{discoveryFound} found</span>
+                )}
+                {sixtyfourPending > 0 && (
+                  <span className="flex items-center gap-1 text-amber-600">
+                    <Clock className="h-3.5 w-3.5" />
+                    {sixtyfourPending} pending via SixtyFour
+                  </span>
+                )}
+                {discoveryItems.filter((i) => i.status === "failed" || i.status === "no_linkedin").length > 0 && (
+                  <span className="text-muted-foreground">
+                    {discoveryItems.filter((i) => i.status === "failed" || i.status === "no_linkedin").length} not found
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Enrichment summary */}
+            {enrichItems.length > 0 && (
+              <div className="flex flex-wrap gap-3 text-sm">
+                <span className="flex items-center gap-1 font-medium">
+                  <Sparkles className="h-4 w-4" /> Enrichment:
+                </span>
+                {enrichedCount > 0 && (
+                  <span className="flex items-center gap-1 text-green-700">
+                    <CheckCircle className="h-4 w-4" /> {enrichedCount} enriched
+                  </span>
+                )}
+                {partialCount > 0 && (
+                  <span className="flex items-center gap-1 text-amber-600">
+                    <AlertCircle className="h-4 w-4" /> {partialCount} partial
+                  </span>
+                )}
+                {failedCount > 0 && (
+                  <span className="flex items-center gap-1 text-red-600">
+                    <XCircle className="h-4 w-4" /> {failedCount} failed
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Per-developer results */}
+            {enrichItems.length > 0 && (
+              <div className="max-h-64 overflow-auto space-y-1.5">
+                {enrichItems.map((item) => {
+                  const discovery = discoveryItems.find(
+                    (d) => d.developerId === item.developerId
+                  );
+                  return (
+                    <div
+                      key={item.developerId}
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <span className="font-medium">{item.name}</span>
+                        {discovery?.githubUrl && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {discovery.githubUrl.replace("https://github.com/", "@")}
+                            {discovery.source && ` via ${discovery.source}`}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {item.fieldsUpdated != null && item.fieldsUpdated > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {item.fieldsUpdated} fields
+                          </span>
+                        )}
+                        {item.status === "enriched" && (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        )}
+                        {item.status === "partial" && (
+                          <AlertCircle className="h-4 w-4 text-amber-500" />
+                        )}
+                        {item.status === "failed" && (
+                          <XCircle className="h-4 w-4 text-red-500" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -188,4 +513,42 @@ export function ImportDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function DiscoveryStatus({ item }: { item: DiscoveryItem }) {
+  switch (item.status) {
+    case "searching":
+      return (
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching...
+        </span>
+      );
+    case "found":
+    case "already_has_github":
+      return (
+        <span className="flex items-center gap-1 text-xs text-green-700">
+          <Github className="h-3.5 w-3.5" />
+          {item.githubUrl?.replace("https://github.com/", "@")}
+          {item.source && <span className="text-muted-foreground">({item.source})</span>}
+        </span>
+      );
+    case "submitted":
+      return (
+        <span className="flex items-center gap-1 text-xs text-amber-600">
+          <Clock className="h-3.5 w-3.5" /> SixtyFour (pending)
+        </span>
+      );
+    case "no_linkedin":
+      return (
+        <span className="text-xs text-muted-foreground">No LinkedIn — needs manual</span>
+      );
+    case "failed":
+      return (
+        <span className="flex items-center gap-1 text-xs text-red-600">
+          <XCircle className="h-3.5 w-3.5" /> Not found
+        </span>
+      );
+    default:
+      return null;
+  }
 }

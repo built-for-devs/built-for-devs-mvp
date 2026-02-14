@@ -13,7 +13,7 @@ interface PaginationControlsProps {
 
 export function PaginationControls({
   totalItems,
-  perPage = 25,
+  perPage = 10,
 }: PaginationControlsProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();

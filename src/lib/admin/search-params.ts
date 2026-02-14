@@ -1,6 +1,6 @@
 import type { DeveloperFilters, ProjectFilters, EvaluationFilters, ScoreFilters } from "@/types/admin";
 
-const ITEMS_PER_PAGE = 25;
+const ITEMS_PER_PAGE = 10;
 
 // Parse comma-separated array from URL param
 function parseArray(value: string | null): string[] | undefined {
@@ -53,6 +53,7 @@ export function parseDeveloperFilters(
     paid_tools: parseArray(get("paid_tools")),
     open_source_activity: parseArray(get("open_source_activity")),
     is_available: parseBool(get("is_available")),
+    sort: get("sort") === "last_enriched_at" ? "last_enriched_at" : undefined,
     page: parseIntParam(get("page")) ?? 1,
     per_page: parseIntParam(get("per_page")) ?? ITEMS_PER_PAGE,
   };
@@ -130,7 +131,7 @@ export function serializeDeveloperFilters(filters: DeveloperFilters): string {
 // Count active filters (excluding pagination)
 export function countActiveFilters(filters: DeveloperFilters): number {
   let count = 0;
-  const skip = new Set(["page", "per_page"]);
+  const skip = new Set(["page", "per_page", "sort"]);
   for (const [key, value] of Object.entries(filters)) {
     if (skip.has(key)) continue;
     if (value === undefined || value === null) continue;

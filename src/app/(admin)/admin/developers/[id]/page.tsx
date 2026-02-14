@@ -8,6 +8,8 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { DeveloperAdminPanel } from "./admin-panel";
 import { EditDeveloperDialog } from "./edit-developer-dialog";
 import { ProjectPickerDialog } from "@/components/admin/project-picker-dialog";
+import { ReEnrichButton } from "./re-enrich-button";
+import { ActivityLog } from "./activity-log";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -32,7 +34,7 @@ export default async function AdminDeveloperDetailPage({
 
   if (!result) notFound();
 
-  const { developer: dev, evaluations } = result;
+  const { developer: dev, evaluations, activityLogs } = result;
 
   // Evaluation stats
   const statusCounts: Record<string, number> = {};
@@ -49,6 +51,7 @@ export default async function AdminDeveloperDetailPage({
         description={dev.profiles.email}
       >
         <div className="flex gap-2">
+          <ReEnrichButton developerId={dev.id} />
           <ProjectPickerDialog developerId={dev.id} existingProjectIds={existingProjectIds} />
           <EditDeveloperDialog developer={dev} />
         </div>
@@ -247,6 +250,9 @@ export default async function AdminDeveloperDetailPage({
           <DeveloperAdminPanel developer={dev} />
         </TabsContent>
       </Tabs>
+
+      <Separator className="my-8" />
+      <ActivityLog entries={activityLogs} />
     </div>
   );
 }

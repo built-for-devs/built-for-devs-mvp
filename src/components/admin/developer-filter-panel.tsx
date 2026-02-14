@@ -57,6 +57,21 @@ export function DeveloperFilterPanel() {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {/* Sort order */}
+      <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
+        <Label className="text-xs whitespace-nowrap">Sort:</Label>
+        <select
+          value={filters.sort ?? "created_at"}
+          onChange={(e) =>
+            updateParam("sort", e.target.value === "created_at" ? undefined : e.target.value)
+          }
+          className="h-6 rounded border-0 bg-transparent text-xs focus:ring-0"
+        >
+          <option value="created_at">Newest</option>
+          <option value="last_enriched_at">Needs Enrichment</option>
+        </select>
+      </div>
+
       {/* Availability toggle */}
       <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
         <Label className="text-xs whitespace-nowrap">Available only</Label>

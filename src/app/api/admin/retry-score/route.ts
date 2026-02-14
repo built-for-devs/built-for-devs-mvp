@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { runScorePipeline } from "@/lib/score/pipeline";
@@ -37,8 +36,8 @@ export async function POST(request: NextRequest) {
       status: "pending",
       error_message: null,
       crawl_data: {},
-      scores: null,
-      full_evaluation: null,
+      scores: {},
+      full_evaluation: {},
       final_score: null,
       classification: null,
       base_score: null,
@@ -56,9 +55,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  after(async () => {
-    await runScorePipeline(scoreId);
-  });
+  // Run pipeline directly (not via after()) so it reliably executes
+  await runScorePipeline(scoreId);
 
   return NextResponse.json({ ok: true });
 }

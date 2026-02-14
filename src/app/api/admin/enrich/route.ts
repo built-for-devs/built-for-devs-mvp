@@ -7,7 +7,7 @@ import {
   type EnrichmentResult,
 } from "@/lib/enrichment";
 
-export const maxDuration = 60; // Allow up to 60s for batch enrichment
+export const maxDuration = 60; // GitHub API + Claude: ~5-10s per contact
 
 function createServiceClient() {
   return createSupabaseClient(
@@ -69,21 +69,41 @@ async function syncToBfd(
     isNew = true;
   }
 
-  // Build enrichment fields
+  // Build enrichment fields — validate enums to prevent Postgres rejecting the entire update
   const VALID_SENIORITY = ["early_career", "senior", "leadership"] as const;
+  const VALID_BUYING_INFLUENCE = ["individual_contributor", "team_influencer", "decision_maker", "budget_holder"] as const;
+  const VALID_COMPANY_SIZE = ["1-10", "11-50", "51-200", "201-1000", "1001-5000", "5000+"] as const;
+  const VALID_OSS_ACTIVITY = ["none", "occasional", "regular", "maintainer"] as const;
+
   const devFields: Record<string, unknown> = {
     imported: true,
     import_source: "folk",
+    last_enriched_at: new Date().toISOString(),
   };
 
-  if (contact.jobTitle) devFields.job_title = contact.jobTitle;
-  if (contact.company) devFields.current_company = contact.company;
+  devFields.job_title = result.data.jobTitle || contact.jobTitle || null;
+  devFields.current_company = result.data.company || contact.company || null;
   if (contact.linkedinUrl) devFields.linkedin_url = contact.linkedinUrl;
+  else if (result.data.linkedinUrl) devFields.linkedin_url = result.data.linkedinUrl;
   if (result.data.country) devFields.country = result.data.country;
   if (result.data.stateRegion) devFields.state_region = result.data.stateRegion;
   if (result.data.city) devFields.city = result.data.city;
+
+  // GitHub-direct fields
+  if (result.data.githubUsername) {
+    devFields.github_url = `https://github.com/${result.data.githubUsername}`;
+  }
+  if (result.data.githubBlog) devFields.website_url = result.data.githubBlog;
+  if (result.data.twitterUsername) {
+    devFields.twitter_url = `https://x.com/${result.data.twitterUsername}`;
+  }
+  if (result.data.openSourceActivity) {
+    if (VALID_OSS_ACTIVITY.includes(result.data.openSourceActivity as (typeof VALID_OSS_ACTIVITY)[number])) {
+      devFields.open_source_activity = result.data.openSourceActivity;
+    }
+  }
+
   if (result.data.seniority) {
-    // Validate against DB enum — "mid" maps to "senior"
     const s = result.data.seniority.toLowerCase();
     const mapped = s === "mid" ? "senior" : s;
     if (VALID_SENIORITY.includes(mapped as (typeof VALID_SENIORITY)[number])) {
@@ -94,16 +114,31 @@ async function syncToBfd(
     const yoe = Number(result.data.yearsExperience);
     if (!isNaN(yoe)) devFields.years_experience = yoe;
   }
-  if (result.data.languages)
-    devFields.languages = result.data.languages
-      .split(",")
-      .map((l) => l.trim())
-      .filter(Boolean);
-  if (result.data.roleType)
-    devFields.role_types = result.data.roleType
-      .split(",")
-      .map((r) => r.trim())
-      .filter(Boolean);
+  if (result.data.buyingInfluence) {
+    const bi = result.data.buyingInfluence.toLowerCase();
+    if (VALID_BUYING_INFLUENCE.includes(bi as (typeof VALID_BUYING_INFLUENCE)[number])) {
+      devFields.buying_influence = bi;
+    }
+  }
+  if (result.data.companySize) {
+    if (VALID_COMPANY_SIZE.includes(result.data.companySize as (typeof VALID_COMPANY_SIZE)[number])) {
+      devFields.company_size = result.data.companySize;
+    }
+  }
+
+  const toArray = (csv: string | null) =>
+    csv ? csv.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+
+  if (result.data.languages) devFields.languages = toArray(result.data.languages);
+  if (result.data.roleType) devFields.role_types = toArray(result.data.roleType);
+  if (result.data.frameworks) devFields.frameworks = toArray(result.data.frameworks);
+  if (result.data.databases) devFields.databases = toArray(result.data.databases);
+  if (result.data.cloudPlatforms) devFields.cloud_platforms = toArray(result.data.cloudPlatforms);
+  if (result.data.paidTools) devFields.paid_tools = toArray(result.data.paidTools);
+  if (result.data.devopsTools) devFields.devops_tools = toArray(result.data.devopsTools);
+  if (result.data.cicdTools) devFields.cicd_tools = toArray(result.data.cicdTools);
+  if (result.data.testingFrameworks) devFields.testing_frameworks = toArray(result.data.testingFrameworks);
+  if (result.data.industries) devFields.industries = toArray(result.data.industries);
 
   // Wait for the handle_new_user trigger to create the developer record.
   // For new users, retry a few times since the trigger runs asynchronously.

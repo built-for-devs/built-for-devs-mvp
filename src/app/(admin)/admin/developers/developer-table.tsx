@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FolderPlus, Trash2 } from "lucide-react";
+import { FolderPlus, Sparkles, Trash2 } from "lucide-react";
 import { deleteDevelopersInBulk } from "@/lib/admin/actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { DeveloperRowEditor } from "./developer-row-editor";
 import { BulkProjectDialog } from "./bulk-project-dialog";
+import { EnrichDialog } from "./enrich-dialog";
 
 interface DeveloperRowData {
   id: string;
@@ -34,6 +35,7 @@ interface DeveloperRowData {
   is_available: boolean;
   total_evaluations: number;
   linkedin_url: string | null;
+  last_enriched_at: string | null;
   profiles: { full_name: string; email: string };
 }
 
@@ -42,6 +44,7 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
+  const [enrichOpen, setEnrichOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ deleted: number; errors: string[] } | null>(null);
 
@@ -89,7 +92,15 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
           <span className="text-sm text-muted-foreground">
             {selected.size} developer{selected.size !== 1 ? "s" : ""} selected
           </span>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEnrichOpen(true)}
+            >
+              <Sparkles className="mr-1.5 h-4 w-4" />
+              Enrich ({selected.size})
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -129,6 +140,7 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
               <TableHead>Exp</TableHead>
               <TableHead>Languages</TableHead>
               <TableHead>Available</TableHead>
+              <TableHead>Enriched</TableHead>
               <TableHead className="text-right">Evals</TableHead>
             </TableRow>
           </TableHeader>
@@ -149,6 +161,15 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
       <BulkProjectDialog
         open={projectOpen}
         onOpenChange={setProjectOpen}
+        developerIds={Array.from(selected)}
+        developerNames={developerNames}
+        onComplete={() => setSelected(new Set())}
+      />
+
+      {/* Enrich dialog (GitHub discovery + AI enrichment) */}
+      <EnrichDialog
+        open={enrichOpen}
+        onOpenChange={setEnrichOpen}
         developerIds={Array.from(selected)}
         developerNames={developerNames}
         onComplete={() => setSelected(new Set())}

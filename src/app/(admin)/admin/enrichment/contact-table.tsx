@@ -1,11 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ExternalLink, FolderPlus, Loader2, Search, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ExternalLink, Loader2, Search, Trash2, Upload, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -14,8 +21,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EnrichDialog } from "./enrich-dialog";
 import { ImportDialog } from "./import-dialog";
+
+type SortOption = "default" | "name-asc" | "name-desc" | "not-enriched-first" | "enriched-first";
 
 interface FolkContactView {
   id: string;
@@ -64,14 +72,12 @@ export function ContactTable({ groupId }: { groupId: string }) {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [enrichOpen, setEnrichOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
-  const [addingToGroup, setAddingToGroup] = useState(false);
   const [emailOnly, setEmailOnly] = useState(true);
   const [activeFilter, setActiveFilter] = useState("");
-  const [customInput, setCustomInput] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [nameSearch, setNameSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("name-asc");
 
   const fetchContacts = useCallback(
     async (cursor?: string) => {
@@ -113,25 +119,17 @@ export function ContactTable({ groupId }: { groupId: string }) {
   function applyPreset(value: string) {
     if (activeFilter === value) {
       setActiveFilter("");
-      setCustomInput("");
     } else {
       setActiveFilter(value);
-      setCustomInput("");
     }
   }
 
-  function applyCustomFilter(input: string) {
-    setCustomInput(input);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setActiveFilter(input);
-    }, 500);
+  function clearNameSearch() {
+    setNameSearch("");
   }
 
   function clearFilter() {
     setActiveFilter("");
-    setCustomInput("");
-    if (debounceRef.current) clearTimeout(debounceRef.current);
   }
 
   function toggleSelect(id: string) {
@@ -157,18 +155,33 @@ export function ContactTable({ groupId }: { groupId: string }) {
 
   const selectedContacts = contacts.filter((c) => selected.has(c.id));
 
-  const enrichContacts = selectedContacts.map((c) => ({
-    folkId: c.id,
-    name: c.fullName ?? `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim(),
-    email: c.email,
-    linkedinUrl: c.linkedinUrl,
-    jobTitle: c.jobTitle,
-    company: c.company,
-  }));
+  const importableSelected = selectedContacts.filter((c) => c.email);
 
-  const enrichedSelected = selectedContacts.filter(
-    (c) => c.enrichmentStatus === "enriched"
-  );
+  const nameFiltered = nameSearch
+    ? contacts.filter((c) => {
+        const name = (c.fullName ?? `${c.firstName ?? ""} ${c.lastName ?? ""}`).trim().toLowerCase();
+        return name.includes(nameSearch.toLowerCase());
+      })
+    : contacts;
+
+  const sortedContacts = [...nameFiltered].sort((a, b) => {
+    const nameA = (a.fullName ?? `${a.firstName ?? ""} ${a.lastName ?? ""}`).trim().toLowerCase();
+    const nameB = (b.fullName ?? `${b.firstName ?? ""} ${b.lastName ?? ""}`).trim().toLowerCase();
+    const statusOrder = { not_enriched: 0, partial: 1, enriched: 2 };
+
+    switch (sortBy) {
+      case "name-asc":
+        return nameA.localeCompare(nameB);
+      case "name-desc":
+        return nameB.localeCompare(nameA);
+      case "not-enriched-first":
+        return statusOrder[a.enrichmentStatus] - statusOrder[b.enrichmentStatus] || nameA.localeCompare(nameB);
+      case "enriched-first":
+        return statusOrder[b.enrichmentStatus] - statusOrder[a.enrichmentStatus] || nameA.localeCompare(nameB);
+      default:
+        return 0;
+    }
+  });
 
   async function removeFromFolk(ids: string[]) {
     setDeleting((prev) => new Set([...prev, ...ids]));
@@ -196,40 +209,6 @@ export function ContactTable({ groupId }: { groupId: string }) {
     });
   }
 
-  async function addToFolkGroup(ids: string[]) {
-    setAddingToGroup(true);
-    try {
-      const res = await fetch("/api/admin/folk/people/add-to-group", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          personIds: ids,
-          groupName: "NEEDS ENRICHMENT",
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error ?? "Failed to add to group");
-        return;
-      }
-      const data = await res.json();
-      if (data.errors?.length) {
-        alert(`Added ${data.added}, but ${data.errors.length} failed.`);
-      }
-      // Remove from current view since they've been queued
-      setContacts((prev) => prev.filter((c) => !ids.includes(c.id)));
-      setSelected((prev) => {
-        const next = new Set(prev);
-        for (const id of ids) next.delete(id);
-        return next;
-      });
-    } catch {
-      alert("Failed to add contacts to group");
-    } finally {
-      setAddingToGroup(false);
-    }
-  }
-
   return (
     <div className="space-y-4">
       {/* Filter bar */}
@@ -253,29 +232,37 @@ export function ContactTable({ groupId }: { groupId: string }) {
           >
             {emailOnly ? "Has Email" : "All Contacts"}
           </Button>
+          <span className="mx-1 text-muted-foreground">|</span>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+            <SelectTrigger className="h-8 w-[170px] text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name-asc">Name A-Z</SelectItem>
+              <SelectItem value="name-desc">Name Z-A</SelectItem>
+              <SelectItem value="not-enriched-first">Not Enriched First</SelectItem>
+              <SelectItem value="enriched-first">Enriched First</SelectItem>
+              <SelectItem value="default">Folk Default</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="relative max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Custom filter (e.g. architect, lead)"
-            value={customInput}
-            onChange={(e) => applyCustomFilter(e.target.value)}
+            placeholder="Search by name..."
+            value={nameSearch}
+            onChange={(e) => setNameSearch(e.target.value)}
             className="pl-9 pr-9"
           />
-          {(activeFilter || customInput) && (
+          {nameSearch && (
             <button
-              onClick={clearFilter}
+              onClick={clearNameSearch}
               className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>
           )}
         </div>
-        {activeFilter && (
-          <p className="text-xs text-muted-foreground">
-            Filtering job titles by: <span className="font-medium">{activeFilter}</span>
-          </p>
-        )}
       </div>
 
       {loading ? (
@@ -307,33 +294,11 @@ export function ContactTable({ groupId }: { groupId: string }) {
             <div className="flex gap-2">
               <Button
                 size="sm"
-                disabled={selected.size === 0}
-                onClick={() => setEnrichOpen(true)}
-              >
-                <Sparkles className="mr-1.5 h-4 w-4" />
-                Enrich ({selected.size})
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={enrichedSelected.length === 0}
+                disabled={importableSelected.length === 0}
                 onClick={() => setImportOpen(true)}
               >
                 <Upload className="mr-1.5 h-4 w-4" />
-                Import to BFD ({enrichedSelected.length})
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={selected.size === 0 || addingToGroup}
-                onClick={() => addToFolkGroup(Array.from(selected))}
-              >
-                {addingToGroup ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                ) : (
-                  <FolderPlus className="mr-1.5 h-4 w-4" />
-                )}
-                Needs Enrichment ({selected.size})
+                Import to BFD ({importableSelected.length})
               </Button>
               <Button
                 size="sm"
@@ -368,7 +333,7 @@ export function ContactTable({ groupId }: { groupId: string }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contacts.map((contact) => {
+                {sortedContacts.map((contact) => {
                   const badge = statusBadge[contact.enrichmentStatus];
                   return (
                     <TableRow key={contact.id}>
@@ -453,20 +418,12 @@ export function ContactTable({ groupId }: { groupId: string }) {
         </>
       )}
 
-      {/* Dialogs */}
-      <EnrichDialog
-        open={enrichOpen}
-        onOpenChange={setEnrichOpen}
-        contacts={enrichContacts}
-        groupId={groupId}
-        onComplete={() => fetchContacts()}
-      />
+      {/* Import dialog */}
       <ImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
-        contacts={selectedContacts.filter(
-          (c) => c.enrichmentStatus === "enriched"
-        )}
+        contacts={importableSelected}
+        folkGroupId={groupId}
       />
     </div>
   );
