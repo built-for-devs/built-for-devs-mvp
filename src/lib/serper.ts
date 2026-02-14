@@ -51,15 +51,9 @@ function extractGitHubUsername(results: SerperResult[]): string | null {
 
 /**
  * Search Google for a GitHub profile matching the given name/company/LinkedIn.
- * Tries many query strategies, most precise first:
- *   1. Name + company (exact quotes, site:github.com)
- *   2. Name only (exact quotes, site:github.com)
- *   3. LinkedIn slug on GitHub (if available)
- *   4. Name + company (no quotes, broader match)
- *   5. Name only (no quotes, broader)
- *   6. Name + "github.com" (no site: restriction — catches mentions on other sites)
- *   7. Name + "github" (broadest — conference talks, portfolios, etc.)
- * Returns the GitHub username if found, or null.
+ * Prioritizes broad searches (which work better) over site:-restricted searches.
+ * Google's site: operator has incomplete coverage, so "Name github" without
+ * site: restriction often finds profiles that site:github.com misses.
  */
 export async function searchGitHubProfile(
   name: string,
@@ -68,17 +62,19 @@ export async function searchGitHubProfile(
 ): Promise<string | null> {
   const key = getApiKey();
 
-  // 1. Try with company first (most precise)
-  if (company) {
-    const result = await serperSearch(key, `site:github.com "${name}" "${company}"`);
-    if (result) return result;
-  }
+  // 1. "Name" github — what works best manually, finds GitHub through cross-references
+  const simpleResult = await serperSearchForGitHubMention(key, `"${name}" github`);
+  if (simpleResult) return simpleResult;
 
-  // 2. Name only with exact quotes
-  const result = await serperSearch(key, `site:github.com "${name}"`);
-  if (result) return result;
+  // 2. Name github (no quotes) — catches name variations, nicknames
+  const noQuoteResult = await serperSearchForGitHubMention(key, `${name} github`);
+  if (noQuoteResult) return noQuoteResult;
 
-  // 3. Try LinkedIn slug — people often cross-link profiles
+  // 3. site:github.com "Name" — direct GitHub page search (works for some)
+  const siteResult = await serperSearch(key, `site:github.com "${name}"`);
+  if (siteResult) return siteResult;
+
+  // 4. LinkedIn slug on GitHub — people often use the same handle
   if (linkedinUrl) {
     const slug = linkedinUrl.match(/linkedin\.com\/in\/([a-zA-Z0-9_-]+)/)?.[1];
     if (slug) {
@@ -87,24 +83,10 @@ export async function searchGitHubProfile(
     }
   }
 
-  // 4. Broader search without exact quotes (catches name variations)
+  // 5. "Name" "Company" github — adds company context for common names
   if (company) {
-    const broadResult = await serperSearch(key, `site:github.com ${name} ${company}`);
-    if (broadResult) return broadResult;
-  }
-
-  // 5. Name without quotes, no company — catches partial name matches
-  const broadNameResult = await serperSearch(key, `site:github.com ${name}`);
-  if (broadNameResult) return broadNameResult;
-
-  // 6. Search without site: restriction — finds GitHub links mentioned on portfolios, blogs, etc.
-  const mentionResult = await serperSearchForGitHubMention(key, `"${name}" "github.com"`);
-  if (mentionResult) return mentionResult;
-
-  // 7. Broadest: name + "github" keyword
-  if (company) {
-    const broadest = await serperSearchForGitHubMention(key, `"${name}" "${company}" github`);
-    if (broadest) return broadest;
+    const companyResult = await serperSearchForGitHubMention(key, `"${name}" "${company}" github`);
+    if (companyResult) return companyResult;
   }
 
   return null;
