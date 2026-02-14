@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, EyeOff, FolderPlus, Loader2, Search, Sparkles, Trash2, XCircle } from "lucide-react";
+import { CheckCircle, EyeOff, FolderPlus, GitMerge, Loader2, Search, Sparkles, Trash2, XCircle } from "lucide-react";
 import { deleteDevelopersInBulk } from "@/lib/admin/actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { DeveloperRowEditor } from "./developer-row-editor";
 import { BulkProjectDialog } from "./bulk-project-dialog";
 import { EnrichDialog } from "./enrich-dialog";
+import { MergeDialog } from "./merge-dialog";
 
 interface DeveloperRowData {
   id: string;
@@ -52,6 +53,7 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
   const [result, setResult] = useState<{ deleted: number; errors: string[] } | null>(null);
   const [anonymized, setAnonymized] = useState(false);
   const [sixtyfourOpen, setSixtyfourOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [sixtyfourSubmitting, setSixtyfourSubmitting] = useState(false);
   const [sixtyfourResults, setSixtyfourResults] = useState<
     { developerId: string; name: string; status: string; taskId?: string }[] | null
@@ -112,10 +114,12 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
     setSixtyfourResults(null);
   }
 
-  // Build a name lookup for the bulk project dialog
+  // Build name/email lookups for dialogs
   const developerNames: Record<string, string> = {};
+  const developerEmails: Record<string, string> = {};
   for (const dev of developers) {
     developerNames[dev.id] = dev.profiles.full_name;
+    developerEmails[dev.id] = dev.profiles.email;
   }
 
   return (
@@ -126,6 +130,16 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
             {selected.size} developer{selected.size !== 1 ? "s" : ""} selected
           </span>
           <div className="flex items-center gap-2">
+            {selected.size === 2 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMergeOpen(true)}
+              >
+                <GitMerge className="mr-1.5 h-4 w-4" />
+                Merge
+              </Button>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -228,6 +242,18 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
         developerNames={developerNames}
         onComplete={() => setSelected(new Set())}
       />
+
+      {/* Merge dialog (exactly 2 selected) */}
+      {selected.size === 2 && (
+        <MergeDialog
+          open={mergeOpen}
+          onOpenChange={setMergeOpen}
+          developerIds={Array.from(selected) as [string, string]}
+          developerNames={developerNames}
+          developerEmails={developerEmails}
+          onComplete={() => setSelected(new Set())}
+        />
+      )}
 
       {/* SixtyFour submit dialog */}
       <Dialog open={sixtyfourOpen} onOpenChange={handleCloseSixtyfour}>

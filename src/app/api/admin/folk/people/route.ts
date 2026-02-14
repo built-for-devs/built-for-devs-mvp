@@ -26,14 +26,9 @@ export async function GET(request: NextRequest) {
     100
   );
   const cursor = searchParams.get("cursor") ?? undefined;
-  const titleFilter = searchParams.get("titleFilter") ?? undefined;
   const emailOnly = searchParams.get("emailOnly") !== "false"; // default true
 
-  const titleKeywords = titleFilter
-    ? titleFilter.toLowerCase().split(",").map((k) => k.trim()).filter(Boolean)
-    : null;
-
-  const needsServerFilter = titleKeywords || emailOnly;
+  const needsServerFilter = emailOnly;
 
   try {
     // Load existing BFD developer emails to exclude already-imported contacts
@@ -68,10 +63,6 @@ export async function GET(request: NextRequest) {
         // Skip contacts without email
         if (emailOnly && !email) continue;
 
-        if (titleKeywords) {
-          const title = (person.jobTitle ?? "").toLowerCase();
-          if (!titleKeywords.some((kw) => title.includes(kw))) continue;
-        }
         matched.push(toContactView(person, groupId));
         if (matched.length >= limit) break;
       }

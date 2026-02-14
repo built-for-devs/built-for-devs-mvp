@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, Loader2, Search, Trash2, Upload, X } from "lucide-react";
+import { ExternalLink, Loader2, Search, Trash2, Upload, UserMinus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -89,7 +89,6 @@ export function ContactTable({ groupId }: { groupId: string }) {
       try {
         let url = `/api/admin/folk/people?groupId=${groupId}&limit=50`;
         if (cursor) url += `&cursor=${cursor}`;
-        if (activeFilter) url += `&titleFilter=${encodeURIComponent(activeFilter)}`;
         if (!emailOnly) url += `&emailOnly=false`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to fetch");
@@ -110,7 +109,7 @@ export function ContactTable({ groupId }: { groupId: string }) {
         setLoadingMore(false);
       }
     },
-    [groupId, activeFilter, emailOnly]
+    [groupId, emailOnly]
   );
 
   useEffect(() => {
@@ -149,7 +148,8 @@ export function ContactTable({ groupId }: { groupId: string }) {
     if (selected.size > 0) {
       setSelected(new Set());
     } else {
-      const ids = contacts.slice(0, MAX_BATCH).map((c) => c.id);
+      // Select from visible (filtered + sorted) contacts
+      const ids = sortedContacts.slice(0, MAX_BATCH).map((c) => c.id);
       setSelected(new Set(ids));
     }
   }
@@ -158,12 +158,31 @@ export function ContactTable({ groupId }: { groupId: string }) {
 
   const importableSelected = selectedContacts.filter((c) => c.email);
 
-  const nameFiltered = nameSearch
+  // Client-side title/role filter — checks job title, company, and enrichment Role type
+  const titleKeywords = activeFilter
+    ? activeFilter.toLowerCase().split(",").map((k) => k.trim()).filter(Boolean)
+    : null;
+
+  const titleFiltered = titleKeywords
     ? contacts.filter((c) => {
+        const searchable = [
+          c.jobTitle,
+          c.company,
+          c.enrichmentData["Role type"],
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return titleKeywords.some((kw) => searchable.includes(kw));
+      })
+    : contacts;
+
+  const nameFiltered = nameSearch
+    ? titleFiltered.filter((c) => {
         const name = (c.fullName ?? `${c.firstName ?? ""} ${c.lastName ?? ""}`).trim().toLowerCase();
         return name.includes(nameSearch.toLowerCase());
       })
-    : contacts;
+    : titleFiltered;
 
   const sortedContacts = [...nameFiltered].sort((a, b) => {
     const nameA = (a.fullName ?? `${a.firstName ?? ""} ${a.lastName ?? ""}`).trim().toLowerCase();
@@ -185,6 +204,32 @@ export function ContactTable({ groupId }: { groupId: string }) {
         return 0;
     }
   });
+
+  async function removeFromGroup(ids: string[]) {
+    setDeleting((prev) => new Set([...prev, ...ids]));
+    try {
+      const res = await fetch("/api/admin/folk/people/remove-from-group", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personIds: ids, groupId }),
+      });
+      if (res.ok) {
+        setContacts((prev) => prev.filter((c) => !ids.includes(c.id)));
+        setSelected((prev) => {
+          const next = new Set(prev);
+          for (const id of ids) next.delete(id);
+          return next;
+        });
+      }
+    } catch {
+      // silently skip failures
+    }
+    setDeleting((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.delete(id);
+      return next;
+    });
+  }
 
   async function removeFromFolk(ids: string[]) {
     setDeleting((prev) => new Set([...prev, ...ids]));
@@ -281,10 +326,13 @@ export function ContactTable({ groupId }: { groupId: string }) {
         </div>
       ) : contacts.length === 0 ? (
         <div className="rounded-md border p-8 text-center">
+          <p className="text-muted-foreground">No contacts in this group.</p>
+        </div>
+      ) : sortedContacts.length === 0 ? (
+        <div className="rounded-md border p-8 text-center">
           <p className="text-muted-foreground">
-            {activeFilter
-              ? "No contacts match this filter."
-              : "No contacts in this group."}
+            No contacts match the current filter.{" "}
+            <button onClick={clearFilter} className="text-primary underline">Clear filter</button>
           </p>
         </div>
       ) : (
@@ -293,7 +341,7 @@ export function ContactTable({ groupId }: { groupId: string }) {
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
               <span>{selected.size}/{MAX_BATCH} selected</span>
-              <span className="ml-2">&middot; {contacts.length} contact{contacts.length !== 1 ? "s" : ""} loaded</span>
+              <span className="ml-2">&middot; {sortedContacts.length}{sortedContacts.length !== contacts.length ? ` of ${contacts.length}` : ""} contact{contacts.length !== 1 ? "s" : ""}{sortedContacts.length !== contacts.length ? " matching" : " loaded"}</span>
             </div>
             <div className="flex gap-2">
               <Button
@@ -306,12 +354,21 @@ export function ContactTable({ groupId }: { groupId: string }) {
               </Button>
               <Button
                 size="sm"
+                variant="outline"
+                disabled={selected.size === 0 || deleting.size > 0}
+                onClick={() => removeFromGroup(Array.from(selected))}
+              >
+                <UserMinus className="mr-1.5 h-4 w-4" />
+                Remove from Group ({selected.size})
+              </Button>
+              <Button
+                size="sm"
                 variant="destructive"
                 disabled={selected.size === 0 || deleting.size > 0}
                 onClick={() => removeFromFolk(Array.from(selected))}
               >
                 <Trash2 className="mr-1.5 h-4 w-4" />
-                Remove from Folk ({selected.size})
+                Delete from Folk ({selected.size})
               </Button>
             </div>
           </div>
@@ -387,15 +444,15 @@ export function ContactTable({ groupId }: { groupId: string }) {
                       </TableCell>
                       <TableCell>
                         <button
-                          onClick={() => removeFromFolk([contact.id])}
+                          onClick={() => removeFromGroup([contact.id])}
                           disabled={deleting.has(contact.id)}
                           className="text-muted-foreground hover:text-destructive disabled:opacity-50"
-                          title="Remove from Folk"
+                          title="Remove from group"
                         >
                           {deleting.has(contact.id) ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Trash2 className="h-4 w-4" />
+                            <UserMinus className="h-4 w-4" />
                           )}
                         </button>
                       </TableCell>

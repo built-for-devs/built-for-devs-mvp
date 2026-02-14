@@ -930,6 +930,182 @@ export async function deleteDevelopersInBulk(
   return { success: true, deleted, errors };
 }
 
+export async function mergeDevelopers(
+  primaryId: string,
+  secondaryId: string
+): Promise<{ success: boolean; error?: string; mergedFields: string[] }> {
+  const authErr = await requireAdmin();
+  if (authErr) return { success: false, error: authErr.error, mergedFields: [] };
+
+  if (primaryId === secondaryId) {
+    return { success: false, error: "Cannot merge a developer with themselves", mergedFields: [] };
+  }
+
+  const supabase = createServiceClient();
+
+  // Fetch both developers with profiles
+  const { data: primary } = await supabase
+    .from("developers")
+    .select("*, profiles!inner(full_name, email)")
+    .eq("id", primaryId)
+    .single();
+
+  const { data: secondary } = await supabase
+    .from("developers")
+    .select("*, profiles!inner(full_name, email)")
+    .eq("id", secondaryId)
+    .single();
+
+  if (!primary || !secondary) {
+    return { success: false, error: "One or both developers not found", mergedFields: [] };
+  }
+
+  const primaryProfile = primary.profiles as unknown as { full_name: string; email: string };
+  const secondaryProfile = secondary.profiles as unknown as { full_name: string; email: string };
+
+  // 1. Reassign evaluations (skip duplicates on same project)
+  const { data: primaryEvals } = await supabase
+    .from("evaluations")
+    .select("project_id")
+    .eq("developer_id", primaryId);
+  const primaryProjectIds = new Set((primaryEvals ?? []).map((e) => e.project_id));
+
+  const { data: secondaryEvals } = await supabase
+    .from("evaluations")
+    .select("id, project_id")
+    .eq("developer_id", secondaryId);
+
+  for (const ev of secondaryEvals ?? []) {
+    if (primaryProjectIds.has(ev.project_id)) {
+      // Duplicate — delete the secondary's evaluation
+      await supabase.from("evaluations").delete().eq("id", ev.id);
+    } else {
+      await supabase
+        .from("evaluations")
+        .update({ developer_id: primaryId })
+        .eq("id", ev.id);
+    }
+  }
+
+  // 2. Reassign activity logs
+  await supabase
+    .from("developer_activity_logs")
+    .update({ developer_id: primaryId })
+    .eq("developer_id", secondaryId);
+
+  // 3. Merge fields — fill blanks on primary from secondary
+  const mergedFields: string[] = [];
+  const stringFields = [
+    "job_title", "current_company", "country", "state_region", "city",
+    "timezone", "linkedin_url", "github_url", "twitter_url", "website_url",
+    "personal_email", "paypal_email", "seniority", "company_size",
+    "buying_influence", "open_source_activity", "folk_person_id", "folk_group_id",
+  ] as const;
+
+  const arrayFields = [
+    "role_types", "languages", "frameworks", "databases", "cloud_platforms",
+    "devops_tools", "cicd_tools", "testing_frameworks", "api_experience",
+    "operating_systems", "industries", "paid_tools",
+  ] as const;
+
+  const numberFields = ["years_experience", "team_size"] as const;
+
+  const updates: Record<string, unknown> = {};
+
+  for (const field of stringFields) {
+    if (!primary[field] && secondary[field]) {
+      updates[field] = secondary[field];
+      mergedFields.push(field);
+    }
+  }
+
+  for (const field of arrayFields) {
+    const pArr = (primary[field] as string[] | null) ?? [];
+    const sArr = (secondary[field] as string[] | null) ?? [];
+    if (pArr.length === 0 && sArr.length > 0) {
+      updates[field] = sArr;
+      mergedFields.push(field);
+    }
+  }
+
+  for (const field of numberFields) {
+    if (primary[field] == null && secondary[field] != null) {
+      updates[field] = secondary[field];
+      mergedFields.push(field);
+    }
+  }
+
+  // 4. Merge alternative_emails — add secondary's primary email + their alt emails
+  const existingEmails = new Set(
+    ((primary.alternative_emails as string[]) ?? []).map((e: string) => e.toLowerCase())
+  );
+  existingEmails.add(primaryProfile.email.toLowerCase());
+  if (primary.personal_email) existingEmails.add((primary.personal_email as string).toLowerCase());
+
+  const newAlts = [...((primary.alternative_emails as string[]) ?? [])];
+  // Add secondary's primary email
+  if (!existingEmails.has(secondaryProfile.email.toLowerCase())) {
+    newAlts.push(secondaryProfile.email.toLowerCase());
+    existingEmails.add(secondaryProfile.email.toLowerCase());
+  }
+  // Add secondary's alt emails
+  for (const alt of (secondary.alternative_emails as string[]) ?? []) {
+    if (!existingEmails.has(alt.toLowerCase())) {
+      newAlts.push(alt.toLowerCase());
+      existingEmails.add(alt.toLowerCase());
+    }
+  }
+  // Add secondary's personal email
+  if (secondary.personal_email && !existingEmails.has((secondary.personal_email as string).toLowerCase())) {
+    newAlts.push((secondary.personal_email as string).toLowerCase());
+  }
+
+  if (newAlts.length > ((primary.alternative_emails as string[]) ?? []).length) {
+    updates.alternative_emails = newAlts;
+    mergedFields.push("alternative_emails");
+  }
+
+  // Apply updates to primary
+  if (Object.keys(updates).length > 0) {
+    const { error: updateErr } = await supabase
+      .from("developers")
+      .update(updates)
+      .eq("id", primaryId);
+    if (updateErr) {
+      return { success: false, error: `Failed to update primary: ${updateErr.message}`, mergedFields: [] };
+    }
+  }
+
+  // 5. Log the merge
+  const adminSupabase = await createClient();
+  const { data: { user: adminUser } } = await adminSupabase.auth.getUser();
+  logDeveloperActivity(supabase, primaryId, adminUser?.id ?? null, "merged", {
+    merged_from: secondaryId,
+    merged_from_name: secondaryProfile.full_name,
+    merged_from_email: secondaryProfile.email,
+    fields_merged: mergedFields,
+  });
+
+  // 6. Delete the secondary developer (CASCADE deletes remaining FKs)
+  const { error: deleteErr } = await supabase
+    .from("developers")
+    .delete()
+    .eq("id", secondaryId);
+
+  if (deleteErr) {
+    return { success: false, error: `Merge partially complete but delete failed: ${deleteErr.message}`, mergedFields };
+  }
+
+  // 7. Delete the secondary's auth user
+  if (secondary.profile_id) {
+    await supabase.auth.admin.deleteUser(secondary.profile_id);
+  }
+
+  revalidatePath("/admin/developers");
+  revalidatePath(`/admin/developers/${primaryId}`);
+  return { success: true, mergedFields };
+}
+
 export async function deleteCompany(companyId: string): Promise<ActionResult> {
   const authErr = await requireAdmin();
   if (authErr) return authErr;
