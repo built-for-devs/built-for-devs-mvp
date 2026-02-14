@@ -90,6 +90,7 @@ export function ContactTable({ groupId }: { groupId: string }) {
         let url = `/api/admin/folk/people?groupId=${groupId}&limit=50`;
         if (cursor) url += `&cursor=${cursor}`;
         if (!emailOnly) url += `&emailOnly=false`;
+        if (activeFilter) url += `&titleFilter=${encodeURIComponent(activeFilter)}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
@@ -109,7 +110,7 @@ export function ContactTable({ groupId }: { groupId: string }) {
         setLoadingMore(false);
       }
     },
-    [groupId, emailOnly]
+    [groupId, emailOnly, activeFilter]
   );
 
   useEffect(() => {
@@ -158,31 +159,12 @@ export function ContactTable({ groupId }: { groupId: string }) {
 
   const importableSelected = selectedContacts.filter((c) => c.email);
 
-  // Client-side title/role filter — checks job title, company, and enrichment Role type
-  const titleKeywords = activeFilter
-    ? activeFilter.toLowerCase().split(",").map((k) => k.trim()).filter(Boolean)
-    : null;
-
-  const titleFiltered = titleKeywords
-    ? contacts.filter((c) => {
-        const searchable = [
-          c.jobTitle,
-          c.company,
-          c.enrichmentData["Role type"],
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        return titleKeywords.some((kw) => searchable.includes(kw));
-      })
-    : contacts;
-
   const nameFiltered = nameSearch
-    ? titleFiltered.filter((c) => {
+    ? contacts.filter((c) => {
         const name = (c.fullName ?? `${c.firstName ?? ""} ${c.lastName ?? ""}`).trim().toLowerCase();
         return name.includes(nameSearch.toLowerCase());
       })
-    : titleFiltered;
+    : contacts;
 
   const sortedContacts = [...nameFiltered].sort((a, b) => {
     const nameA = (a.fullName ?? `${a.firstName ?? ""} ${a.lastName ?? ""}`).trim().toLowerCase();

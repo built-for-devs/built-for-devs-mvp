@@ -27,8 +27,13 @@ export async function GET(request: NextRequest) {
   );
   const cursor = searchParams.get("cursor") ?? undefined;
   const emailOnly = searchParams.get("emailOnly") !== "false"; // default true
+  const titleFilter = searchParams.get("titleFilter") ?? undefined;
 
-  const needsServerFilter = emailOnly;
+  const titleKeywords = titleFilter
+    ? titleFilter.toLowerCase().split(",").map((k) => k.trim()).filter(Boolean)
+    : null;
+
+  const needsServerFilter = emailOnly || titleKeywords;
 
   try {
     // Load existing BFD developer emails to exclude already-imported contacts
@@ -62,6 +67,24 @@ export async function GET(request: NextRequest) {
 
         // Skip contacts without email
         if (emailOnly && !email) continue;
+
+        // Title/role filter — search job title, company name, and group custom fields
+        if (titleKeywords) {
+          const searchParts = [
+            person.jobTitle,
+            person.companies?.[0]?.name,
+          ];
+          // Also search group custom field values (e.g. "Role type")
+          const groupFields = person.customFieldValues?.[groupId];
+          if (groupFields) {
+            for (const val of Object.values(groupFields)) {
+              if (typeof val === "string") searchParts.push(val);
+              else if (Array.isArray(val)) searchParts.push(...val.map(String));
+            }
+          }
+          const searchable = searchParts.filter(Boolean).join(" ").toLowerCase();
+          if (!titleKeywords.some((kw) => searchable.includes(kw))) continue;
+        }
 
         matched.push(toContactView(person, groupId));
         if (matched.length >= limit) break;

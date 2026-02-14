@@ -3,6 +3,30 @@ import { createClient } from "@/lib/supabase/server";
 
 const FOLK_BASE = "https://api.folk.app/v1";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function folkFetchWithRetry(
+  url: string,
+  init: RequestInit,
+  maxRetries = 3
+): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, init);
+    if (res.status === 429) {
+      const retryAfter = res.headers.get("retry-after");
+      const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000 * (attempt + 1);
+      console.log(`[RemoveFromGroup] 429 rate limited, waiting ${waitMs}ms before retry ${attempt + 1}`);
+      await sleep(waitMs);
+      continue;
+    }
+    return res;
+  }
+  // Final attempt without retry
+  return fetch(url, init);
+}
+
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -27,15 +51,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "personIds and groupId required" }, { status: 400 });
   }
 
+  const headers = { Authorization: `Bearer ${key}` };
   let removed = 0;
   const errors: string[] = [];
 
-  for (const personId of personIds) {
+  for (let i = 0; i < personIds.length; i++) {
+    const personId = personIds[i];
+
+    // Throttle: wait between requests to avoid 429
+    if (i > 0) await sleep(500);
+
     try {
-      // Fetch current person to get their existing groups
-      const getRes = await fetch(`${FOLK_BASE}/people/${personId}`, {
-        headers: { Authorization: `Bearer ${key}` },
-      });
+      const getRes = await folkFetchWithRetry(
+        `${FOLK_BASE}/people/${personId}`,
+        { headers }
+      );
       if (!getRes.ok) {
         const text = await getRes.text();
         console.error(`[RemoveFromGroup] GET failed for ${personId}: ${getRes.status} ${text}`);
@@ -48,29 +78,29 @@ export async function POST(request: NextRequest) {
         (g: { id: string }) => ({ id: g.id })
       );
 
-      console.log(`[RemoveFromGroup] ${personId}: current groups =`, JSON.stringify(currentGroups.map((g: { id: string }) => g.id)));
-      console.log(`[RemoveFromGroup] ${personId}: removing groupId = ${groupId}`);
-
       // Filter out the target group
       const updatedGroups = currentGroups.filter((g) => g.id !== groupId);
 
       if (updatedGroups.length === currentGroups.length) {
-        console.log(`[RemoveFromGroup] ${personId}: group not found in current groups, skipping`);
+        // Group not found — treat as already removed
         removed++;
         continue;
       }
 
-      const patchBody = { groups: updatedGroups };
-      console.log(`[RemoveFromGroup] ${personId}: PATCH body =`, JSON.stringify(patchBody));
+      // Throttle before PATCH
+      await sleep(300);
 
-      const patchRes = await fetch(`${FOLK_BASE}/people/${personId}`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(patchBody),
-      });
+      const patchRes = await folkFetchWithRetry(
+        `${FOLK_BASE}/people/${personId}`,
+        {
+          method: "PATCH",
+          headers: {
+            ...headers,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ groups: updatedGroups }),
+        }
+      );
 
       if (!patchRes.ok) {
         const text = await patchRes.text();
@@ -79,8 +109,6 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const patchData = await patchRes.json();
-      console.log(`[RemoveFromGroup] ${personId}: PATCH success, response groups =`, JSON.stringify((patchData.data?.groups ?? []).map((g: { id: string }) => g.id)));
       removed++;
     } catch (err) {
       console.error(`[RemoveFromGroup] Exception for ${personId}:`, err);
