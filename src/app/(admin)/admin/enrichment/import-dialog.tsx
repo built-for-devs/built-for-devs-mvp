@@ -32,6 +32,14 @@ import {
 import { importFromFolk } from "@/lib/admin/actions";
 import type { FolkImportContact } from "@/lib/admin/actions";
 
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
 type Phase = "confirm" | "importing" | "discovering" | "enriching" | "complete";
 
 interface ContactView {
@@ -156,7 +164,7 @@ export function ImportDialog({
     }
   }
 
-  // ── Phase 2: GitHub Discovery ──
+  // ── Phase 2: GitHub Discovery (batched in chunks of 10) ──
 
   async function startDiscovery(devIds: string[], names: Record<string, string>) {
     setPhase("discovering");
@@ -168,39 +176,54 @@ export function ImportDialog({
       }))
     );
 
-    try {
-      const res = await fetch("/api/admin/github-discovery", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ developerIds: devIds }),
-      });
+    const allItems: DiscoveryItem[] = [];
+    const chunks = chunkArray(devIds, 10);
 
-      if (!res.ok) throw new Error("Discovery request failed");
-      const data = await res.json();
+    for (const chunk of chunks) {
+      try {
+        const res = await fetch("/api/admin/github-discovery", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ developerIds: chunk }),
+        });
 
-      const items: DiscoveryItem[] = data.results.map((r: DiscoveryItem) => ({
-        developerId: r.developerId,
-        name: r.name,
-        status: r.status === "submitted" ? "submitted" : r.status,
-        githubUrl: r.githubUrl,
-        taskId: r.taskId,
-        source: r.source,
-      }));
+        if (!res.ok) throw new Error("Discovery request failed");
+        const data = await res.json();
 
-      setDiscoveryItems(items);
+        const items: DiscoveryItem[] = data.results.map((r: DiscoveryItem) => ({
+          developerId: r.developerId,
+          name: r.name,
+          status: r.status === "submitted" ? "submitted" : r.status,
+          githubUrl: r.githubUrl,
+          taskId: r.taskId,
+          source: r.source,
+        }));
 
-      // Don't poll SixtyFour — proceed to enrichment immediately.
-      // SixtyFour results are collected later via "Collect Results" on Developers page.
-      startEnrichment(devIds, names);
-    } catch {
-      setDiscoveryItems((prev) =>
-        prev.map((i) => ({ ...i, status: "failed" as const }))
-      );
-      startEnrichment(devIds, names);
+        allItems.push(...items);
+        // Update UI progressively as each batch completes
+        const completedIds = new Set(allItems.map((i) => i.developerId));
+        setDiscoveryItems(
+          allItems.concat(
+            devIds
+              .filter((id) => !completedIds.has(id))
+              .map((id) => ({ developerId: id, name: names[id] ?? "Unknown", status: "searching" as const }))
+          )
+        );
+      } catch {
+        // Mark this chunk as failed, continue with remaining chunks
+        for (const id of chunk) {
+          allItems.push({ developerId: id, name: names[id] ?? "Unknown", status: "failed" });
+        }
+      }
     }
+
+    setDiscoveryItems(allItems);
+    // Don't poll SixtyFour — proceed to enrichment immediately.
+    // SixtyFour results are collected later via "Collect Results" on Developers page.
+    startEnrichment(devIds, names);
   }
 
-  // ── Phase 3: Enrichment ──
+  // ── Phase 3: Enrichment (batched in chunks of 10) ──
 
   async function startEnrichment(devIds: string[], names: Record<string, string>) {
     setPhase("enriching");
@@ -212,33 +235,48 @@ export function ImportDialog({
       }))
     );
 
-    try {
-      const res = await fetch("/api/admin/re-enrich", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ developerIds: devIds }),
-      });
+    const allItems: EnrichItem[] = [];
+    const chunks = chunkArray(devIds, 10);
 
-      if (!res.ok) throw new Error("Enrichment failed");
-      const data = await res.json();
+    for (const chunk of chunks) {
+      try {
+        const res = await fetch("/api/admin/re-enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ developerIds: chunk }),
+        });
 
-      const items: EnrichItem[] = data.results.map(
-        (r: { id: string; name: string; status: string; data?: Record<string, unknown> }) => ({
-          developerId: r.id,
-          name: r.name,
-          status: r.status === "failed" ? "failed" : r.status === "partial" ? "partial" : "enriched",
-          fieldsUpdated: r.data ? Object.keys(r.data).filter((k) => r.data![k] != null).length : 0,
-        })
-      );
+        if (!res.ok) throw new Error("Enrichment failed");
+        const data = await res.json();
 
-      setEnrichItems(items);
-      setPhase("complete");
-    } catch {
-      setEnrichItems((prev) =>
-        prev.map((i) => ({ ...i, status: "failed" as const }))
-      );
-      setPhase("complete");
+        const items: EnrichItem[] = data.results.map(
+          (r: { id: string; name: string; status: string; data?: Record<string, unknown> }) => ({
+            developerId: r.id,
+            name: r.name,
+            status: r.status === "failed" ? "failed" : r.status === "partial" ? "partial" : "enriched",
+            fieldsUpdated: r.data ? Object.keys(r.data).filter((k) => r.data![k] != null).length : 0,
+          })
+        );
+
+        allItems.push(...items);
+        // Update UI progressively
+        const completedIds = new Set(allItems.map((i) => i.developerId));
+        setEnrichItems(
+          allItems.concat(
+            devIds
+              .filter((id) => !completedIds.has(id))
+              .map((id) => ({ developerId: id, name: names[id] ?? "Unknown", status: "enriched" as const }))
+          )
+        );
+      } catch {
+        for (const id of chunk) {
+          allItems.push({ developerId: id, name: names[id] ?? "Unknown", status: "failed" });
+        }
+      }
     }
+
+    setEnrichItems(allItems);
+    setPhase("complete");
   }
 
   // ── Counts ──

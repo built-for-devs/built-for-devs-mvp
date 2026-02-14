@@ -38,7 +38,7 @@ interface FolkContactView {
   enrichmentData: Record<string, string | null>;
 }
 
-const MAX_BATCH = 10;
+const MAX_BATCH = 50;
 
 const FILTER_PRESETS = [
   { label: "Engineers & Developers", value: "engineer,developer,software" },
