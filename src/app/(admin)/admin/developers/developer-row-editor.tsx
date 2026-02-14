@@ -57,10 +57,12 @@ export function DeveloperRowEditor({
   dev,
   selected,
   onToggleSelect,
+  anonymized,
 }: {
   dev: DeveloperRowData;
   selected?: boolean;
   onToggleSelect?: () => void;
+  anonymized?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -98,15 +100,17 @@ export function DeveloperRowEditor({
         </TableCell>
       )}
       {/* Name */}
-      <TableCell>
-        <Link
-          href={`/admin/developers/${dev.id}`}
-          className="font-medium hover:underline"
-        >
-          {dev.profiles.full_name}
-        </Link>
-        <p className="text-xs text-muted-foreground">{dev.profiles.email}</p>
-      </TableCell>
+      {!anonymized && (
+        <TableCell>
+          <Link
+            href={`/admin/developers/${dev.id}`}
+            className="font-medium hover:underline"
+          >
+            {dev.profiles.full_name}
+          </Link>
+          <p className="text-xs text-muted-foreground">{dev.profiles.email}</p>
+        </TableCell>
+      )}
 
       {/* Social Links */}
       <TableCell>

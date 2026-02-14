@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getFolkPeople, toContactView, extractLinkedinUrl, getEnrichmentStatus } from "@/lib/folk";
+import { getFolkPeople, toContactView } from "@/lib/folk";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -27,15 +27,13 @@ export async function GET(request: NextRequest) {
   );
   const cursor = searchParams.get("cursor") ?? undefined;
   const titleFilter = searchParams.get("titleFilter") ?? undefined;
-  const linkedinOnly = searchParams.get("linkedinOnly") !== "false"; // default true
-  const excludeEnriched = searchParams.get("excludeEnriched") !== "false"; // default true
   const emailOnly = searchParams.get("emailOnly") !== "false"; // default true
 
   const titleKeywords = titleFilter
     ? titleFilter.toLowerCase().split(",").map((k) => k.trim()).filter(Boolean)
     : null;
 
-  const needsServerFilter = linkedinOnly || titleKeywords || excludeEnriched || emailOnly;
+  const needsServerFilter = titleKeywords || emailOnly;
 
   try {
     // Load existing BFD developer emails to exclude already-imported contacts
@@ -70,8 +68,6 @@ export async function GET(request: NextRequest) {
         // Skip contacts without email
         if (emailOnly && !email) continue;
 
-        if (linkedinOnly && !extractLinkedinUrl(person, groupId)) continue;
-        if (excludeEnriched && getEnrichmentStatus(person, groupId) === "enriched") continue;
         if (titleKeywords) {
           const title = (person.jobTitle ?? "").toLowerCase();
           if (!titleKeywords.some((kw) => title.includes(kw))) continue;

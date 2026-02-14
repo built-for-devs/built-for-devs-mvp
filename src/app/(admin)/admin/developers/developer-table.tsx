@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FolderPlus, Sparkles, Trash2 } from "lucide-react";
+import { EyeOff, FolderPlus, Sparkles, Trash2 } from "lucide-react";
 import { deleteDevelopersInBulk } from "@/lib/admin/actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,6 +20,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { DeveloperRowEditor } from "./developer-row-editor";
 import { BulkProjectDialog } from "./bulk-project-dialog";
 import { EnrichDialog } from "./enrich-dialog";
@@ -48,6 +50,7 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
   const [enrichOpen, setEnrichOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<{ deleted: number; errors: string[] } | null>(null);
+  const [anonymized, setAnonymized] = useState(false);
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -122,6 +125,17 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
         </div>
       )}
 
+      <div className="flex justify-end">
+        <div className="flex items-center gap-2">
+          <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+          <Label className="text-xs text-muted-foreground">Anonymize</Label>
+          <Switch
+            checked={anonymized}
+            onCheckedChange={setAnonymized}
+          />
+        </div>
+      </div>
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -132,7 +146,7 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead>Name</TableHead>
+              {!anonymized && <TableHead>Name</TableHead>}
               <TableHead className="w-10"></TableHead>
               <TableHead className="max-w-[180px]">Job Title</TableHead>
               <TableHead>Company</TableHead>
@@ -152,6 +166,7 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
                 dev={dev}
                 selected={selected.has(dev.id)}
                 onToggleSelect={() => toggleSelect(dev.id)}
+                anonymized={anonymized}
               />
             ))}
           </TableBody>

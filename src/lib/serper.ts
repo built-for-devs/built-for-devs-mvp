@@ -144,21 +144,6 @@ export async function findGitHubViaWebsite(
   company?: string | null
 ): Promise<string | null> {
   const key = getApiKey();
-  const q = company ? `"${name}" "${company}"` : `"${name}" developer`;
-
-  const res = await fetch("https://google.serper.dev/search", {
-    method: "POST",
-    headers: {
-      "X-API-KEY": key,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ q, num: 5 }),
-  });
-
-  if (!res.ok) return null;
-
-  const data = await res.json();
-  const organic: SerperResult[] = data.organic ?? [];
 
   // Skip social media / large platforms — we only want personal sites
   const skipDomains = [
@@ -167,15 +152,36 @@ export async function findGitHubViaWebsite(
     "stackoverflow.com", "crunchbase.com", "bloomberg.com",
   ];
 
-  for (const result of organic) {
-    try {
-      const domain = new URL(result.link).hostname.replace(/^www\./, "");
-      if (skipDomains.some((d) => domain === d || domain.endsWith(`.${d}`))) continue;
+  // Try multiple queries: name+company first (precise), then just name (broad)
+  const queries = [];
+  if (company) queries.push(`"${name}" "${company}"`);
+  queries.push(`"${name}"`);
 
-      const username = await crawlForGitHub(result.link);
-      if (username) return username;
-    } catch {
-      continue;
+  for (const q of queries) {
+    const res = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": key,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ q, num: 10 }),
+    });
+
+    if (!res.ok) continue;
+
+    const data = await res.json();
+    const organic: SerperResult[] = data.organic ?? [];
+
+    for (const result of organic) {
+      try {
+        const domain = new URL(result.link).hostname.replace(/^www\./, "");
+        if (skipDomains.some((d) => domain === d || domain.endsWith(`.${d}`))) continue;
+
+        const username = await crawlForGitHub(result.link);
+        if (username) return username;
+      } catch {
+        continue;
+      }
     }
   }
 
