@@ -36,16 +36,21 @@ export async function updateDeveloperNotes(
   developerId: string,
   notes: string
 ): Promise<ActionResult> {
+  const authResult = await requireAdmin();
+  if (authResult) return authResult;
+
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const serviceClient = createServiceClient();
+  const { error } = await serviceClient
     .from("developers")
     .update({ admin_notes: notes })
     .eq("id", developerId);
 
   if (error) return { success: false, error: error.message };
 
-  const { data: { user } } = await supabase.auth.getUser();
-  logDeveloperActivity(supabase, developerId, user?.id ?? null, "updated_notes");
+  logDeveloperActivity(serviceClient, developerId, user?.id ?? null, "updated_notes");
 
   revalidatePath("/admin/developers");
   return { success: true };
@@ -55,16 +60,21 @@ export async function updateDeveloperAvailability(
   developerId: string,
   isAvailable: boolean
 ): Promise<ActionResult> {
+  const authResult = await requireAdmin();
+  if (authResult) return authResult;
+
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const serviceClient = createServiceClient();
+  const { error } = await serviceClient
     .from("developers")
     .update({ is_available: isAvailable })
     .eq("id", developerId);
 
   if (error) return { success: false, error: error.message };
 
-  const { data: { user } } = await supabase.auth.getUser();
-  logDeveloperActivity(supabase, developerId, user?.id ?? null, "updated_availability", {
+  logDeveloperActivity(serviceClient, developerId, user?.id ?? null, "updated_availability", {
     is_available: isAvailable,
   });
 
@@ -76,16 +86,21 @@ export async function updateDeveloperQualityRating(
   developerId: string,
   rating: number
 ): Promise<ActionResult> {
+  const authResult = await requireAdmin();
+  if (authResult) return authResult;
+
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const serviceClient = createServiceClient();
+  const { error } = await serviceClient
     .from("developers")
     .update({ quality_rating: rating })
     .eq("id", developerId);
 
   if (error) return { success: false, error: error.message };
 
-  const { data: { user } } = await supabase.auth.getUser();
-  logDeveloperActivity(supabase, developerId, user?.id ?? null, "updated_quality_rating", {
+  logDeveloperActivity(serviceClient, developerId, user?.id ?? null, "updated_quality_rating", {
     rating,
   });
 
@@ -97,16 +112,21 @@ export async function updateDeveloperProfile(
   developerId: string,
   data: Record<string, unknown>
 ): Promise<ActionResult> {
+  const authResult = await requireAdmin();
+  if (authResult) return authResult;
+
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const serviceClient = createServiceClient();
+  const { error } = await serviceClient
     .from("developers")
     .update(data)
     .eq("id", developerId);
 
   if (error) return { success: false, error: error.message };
 
-  const { data: { user } } = await supabase.auth.getUser();
-  logDeveloperActivity(supabase, developerId, user?.id ?? null, "edited_profile", {
+  logDeveloperActivity(serviceClient, developerId, user?.id ?? null, "edited_profile", {
     fields: Object.keys(data),
   });
 

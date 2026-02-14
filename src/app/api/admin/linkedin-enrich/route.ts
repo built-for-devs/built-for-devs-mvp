@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { queryLinkedInProfile } from "@/lib/agentql";
+import { scrapeLinkedInProfile, type LinkedInRawProfile } from "@/lib/agentql";
 import { logDeveloperActivity } from "@/lib/admin/activity-log";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 function createServiceClient() {
   return createSupabaseClient(
@@ -13,76 +14,210 @@ function createServiceClient() {
   );
 }
 
-// ── Skills taxonomy for mapping LinkedIn skills → DB columns ──
-
-const LANGUAGES = new Set([
-  "javascript", "typescript", "python", "java", "c#", "c++", "c", "go",
-  "rust", "ruby", "php", "swift", "kotlin", "scala", "r", "perl",
-  "elixir", "clojure", "haskell", "lua", "dart", "objective-c", "shell",
-  "bash", "powershell", "sql", "html", "css", "solidity",
-]);
-
-const FRAMEWORKS = new Set([
-  "react", "react.js", "reactjs", "next.js", "nextjs", "angular", "vue",
-  "vue.js", "vuejs", "svelte", "express", "express.js", "django", "flask",
-  "fastapi", "spring", "spring boot", "rails", "ruby on rails", "laravel",
-  ".net", "asp.net", "node.js", "nodejs", "deno", "remix", "gatsby",
-  "nuxt", "nuxt.js", "ember", "backbone", "tailwind", "tailwindcss",
-  "bootstrap", "jquery", "graphql",
-]);
-
-const CLOUD_PLATFORMS = new Set([
-  "aws", "amazon web services", "azure", "microsoft azure", "gcp",
-  "google cloud", "google cloud platform", "vercel", "heroku",
-  "digitalocean", "cloudflare", "netlify", "firebase",
-]);
-
-const DATABASES = new Set([
-  "postgresql", "postgres", "mysql", "mongodb", "redis", "elasticsearch",
-  "dynamodb", "sqlite", "oracle", "sql server", "cassandra", "neo4j",
-  "supabase", "firebase", "cockroachdb", "mariadb",
-]);
-
-function classifySkills(skills: string[]): {
-  languages: string[];
-  frameworks: string[];
-  cloudPlatforms: string[];
-  databases: string[];
-} {
-  const languages: string[] = [];
-  const frameworks: string[] = [];
-  const cloudPlatforms: string[] = [];
-  const databases: string[] = [];
-
-  for (const skill of skills) {
-    const lower = skill.toLowerCase().trim();
-    if (LANGUAGES.has(lower)) languages.push(lower);
-    else if (FRAMEWORKS.has(lower)) frameworks.push(lower);
-    else if (CLOUD_PLATFORMS.has(lower)) cloudPlatforms.push(lower);
-    else if (DATABASES.has(lower)) databases.push(lower);
+let _anthropic: Anthropic | null = null;
+function getAnthropic() {
+  if (!_anthropic) {
+    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
   }
-
-  return { languages, frameworks, cloudPlatforms, databases };
+  return _anthropic;
 }
 
-// ── Location parsing ──
+// ── Claude extraction from LinkedIn profile ──
 
-function parseLocation(location: string): {
-  city: string | null;
-  stateRegion: string | null;
-  country: string | null;
-} {
-  const parts = location.split(",").map((p) => p.trim()).filter(Boolean);
-  if (parts.length >= 3) {
-    return { city: parts[0], stateRegion: parts[1], country: parts[2] };
+async function extractFieldsFromLinkedIn(
+  rawProfile: LinkedInRawProfile,
+  existingName: string,
+  existingEmail: string | null
+): Promise<Record<string, unknown>> {
+  // Build context from the raw LinkedIn profile
+  const contextParts: string[] = [];
+  contextParts.push(`Person: ${existingName}`);
+  if (existingEmail) contextParts.push(`Email: ${existingEmail}`);
+
+  if (rawProfile.full_name) contextParts.push(`LinkedIn Name: ${rawProfile.full_name}`);
+  if (rawProfile.headline) contextParts.push(`Headline: ${rawProfile.headline}`);
+  if (rawProfile.location) contextParts.push(`Location: ${rawProfile.location}`);
+
+  if (rawProfile.about) {
+    contextParts.push(`\nAbout section:\n${rawProfile.about}`);
   }
-  if (parts.length === 2) {
-    return { city: parts[0], stateRegion: null, country: parts[1] };
+
+  if (rawProfile.experience.length > 0) {
+    contextParts.push(`\nWork Experience:`);
+    for (const exp of rawProfile.experience) {
+      const parts = [exp.title, exp.company, exp.date_range, exp.location]
+        .filter(Boolean)
+        .join(" | ");
+      contextParts.push(`  - ${parts}`);
+      if (exp.description) {
+        contextParts.push(`    ${exp.description}`);
+      }
+    }
   }
-  if (parts.length === 1) {
-    return { city: null, stateRegion: null, country: parts[0] };
+
+  if (rawProfile.education.length > 0) {
+    contextParts.push(`\nEducation:`);
+    for (const edu of rawProfile.education) {
+      const parts = [edu.school, edu.degree, edu.field_of_study, edu.date_range]
+        .filter(Boolean)
+        .join(" | ");
+      contextParts.push(`  - ${parts}`);
+    }
   }
-  return { city: null, stateRegion: null, country: null };
+
+  if (rawProfile.skills.length > 0) {
+    contextParts.push(`\nSkills: ${rawProfile.skills.join(", ")}`);
+  }
+
+  if (rawProfile.certifications.length > 0) {
+    contextParts.push(`\nCertifications: ${rawProfile.certifications.join(", ")}`);
+  }
+
+  if (rawProfile.languages.length > 0) {
+    contextParts.push(`\nLanguages spoken: ${rawProfile.languages.join(", ")}`);
+  }
+
+  const prompt = `Analyze this developer's LinkedIn profile data and return a JSON object with the following fields.
+Use ONLY the data provided — do not make up information. If a field cannot be determined, use null.
+
+${contextParts.join("\n")}
+
+Return a JSON object with these exact fields:
+{
+  "seniority": one of "leadership", "senior", or "early_career" (leadership = VP/Director/CTO/Founder; senior = Senior/Staff/Lead/5+ years; early_career = Junior/Intern/<5 years),
+  "role_type": comma-separated from: "full-stack", "frontend", "backend", "mobile", "devops", "data-engineer",
+  "languages": comma-separated programming languages mentioned or implied by their work,
+  "frameworks": comma-separated frameworks/libraries (React, Django, Express, Next.js, FastAPI, etc.),
+  "databases": comma-separated database technologies if mentioned (PostgreSQL, MongoDB, Redis, etc.),
+  "cloud_platforms": comma-separated cloud providers if mentioned (AWS, GCP, Azure, Vercel, etc.),
+  "paid_tools": comma-separated paid dev tools if mentioned,
+  "devops_tools": comma-separated DevOps tools if mentioned (Docker, Kubernetes, Terraform, etc.),
+  "cicd_tools": comma-separated CI/CD tools if mentioned (GitHub Actions, Jenkins, etc.),
+  "testing_frameworks": comma-separated testing tools if mentioned (Jest, Pytest, Cypress, etc.),
+  "buying_influence": one of "decision_maker", "budget_holder", "team_influencer", or "individual_contributor",
+  "industries": comma-separated industries they've worked in (SaaS, FinTech, Healthcare, etc.),
+  "company_size": estimate current company size ("1-10", "11-50", "51-200", "201-1000", "1001-5000", "5000+"),
+  "years_experience": estimated total years of professional software development (number as string),
+  "city": city name or null,
+  "state_region": full state/region name (e.g. "California" not "CA") or null,
+  "country": full country name (e.g. "United States" not "US") or null,
+  "job_title": their current job title,
+  "company": their current company name,
+  "open_source_activity": one of "none", "occasional", "regular", or "maintainer" based on any OSS mentions
+}
+
+Return ONLY the JSON object, no markdown fences or extra text.`;
+
+  const response = await getAnthropic().messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 1024,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text : "";
+
+  const cleaned = text
+    .replace(/```json?\n?/g, "")
+    .replace(/```\n?/g, "")
+    .trim();
+  return JSON.parse(cleaned);
+}
+
+// ── Map Claude output to DB fields (same logic as re-enrich buildDevFields) ──
+
+function buildDevFields(
+  data: Record<string, unknown>,
+  existing: Record<string, unknown>,
+  overwriteKeys: Set<string> = new Set()
+): { fields: Record<string, unknown>; fieldsUpdated: string[] } {
+  const VALID_SENIORITY = ["early_career", "senior", "leadership"] as const;
+  const VALID_BUYING_INFLUENCE = [
+    "individual_contributor", "team_influencer", "decision_maker", "budget_holder",
+  ] as const;
+  const VALID_COMPANY_SIZE = [
+    "1-10", "11-50", "51-200", "201-1000", "1001-5000", "5000+",
+  ] as const;
+  const VALID_OSS_ACTIVITY = ["none", "occasional", "regular", "maintainer"] as const;
+
+  const fields: Record<string, unknown> = {};
+  const fieldsUpdated: string[] = [];
+
+  const toArray = (csv: unknown) =>
+    typeof csv === "string"
+      ? csv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+      : undefined;
+
+  // Only fill empty fields (unless key is in overwriteKeys)
+  function setIfEmpty(
+    dbKey: string,
+    value: unknown,
+    transform?: (v: unknown) => unknown
+  ) {
+    if (!overwriteKeys.has(dbKey)) {
+      if (existing[dbKey] != null && existing[dbKey] !== "" && existing[dbKey] !== 0) {
+        if (Array.isArray(existing[dbKey]) && (existing[dbKey] as unknown[]).length > 0) return;
+        if (!Array.isArray(existing[dbKey])) return;
+      }
+    }
+    if (value == null || value === "" || value === "null") return;
+    const finalValue = transform ? transform(value) : value;
+    if (finalValue == null) return;
+    if (Array.isArray(finalValue) && finalValue.length === 0) return;
+    fields[dbKey] = finalValue;
+    fieldsUpdated.push(dbKey);
+  }
+
+  setIfEmpty("job_title", data.job_title);
+  setIfEmpty("current_company", data.company);
+  setIfEmpty("city", data.city);
+  setIfEmpty("state_region", data.state_region);
+  setIfEmpty("country", data.country);
+
+  setIfEmpty("seniority", data.seniority, (v) => {
+    const s = String(v).toLowerCase();
+    const mapped = s === "mid" ? "senior" : s;
+    return VALID_SENIORITY.includes(mapped as (typeof VALID_SENIORITY)[number]) ? mapped : null;
+  });
+
+  setIfEmpty("years_experience", data.years_experience, (v) => {
+    const n = Number(v);
+    return !isNaN(n) && n > 0 ? n : null;
+  });
+
+  setIfEmpty("buying_influence", data.buying_influence, (v) => {
+    const bi = String(v).toLowerCase();
+    return VALID_BUYING_INFLUENCE.includes(bi as (typeof VALID_BUYING_INFLUENCE)[number])
+      ? bi
+      : null;
+  });
+
+  setIfEmpty("company_size", data.company_size, (v) =>
+    VALID_COMPANY_SIZE.includes(String(v) as (typeof VALID_COMPANY_SIZE)[number])
+      ? String(v)
+      : null
+  );
+
+  setIfEmpty("open_source_activity", data.open_source_activity, (v) => {
+    const oss = String(v).toLowerCase();
+    return VALID_OSS_ACTIVITY.includes(oss as (typeof VALID_OSS_ACTIVITY)[number])
+      ? oss
+      : null;
+  });
+
+  // Array fields
+  setIfEmpty("role_types", data.role_type, toArray);
+  setIfEmpty("languages", data.languages, toArray);
+  setIfEmpty("frameworks", data.frameworks, toArray);
+  setIfEmpty("databases", data.databases, toArray);
+  setIfEmpty("cloud_platforms", data.cloud_platforms, toArray);
+  setIfEmpty("devops_tools", data.devops_tools, toArray);
+  setIfEmpty("cicd_tools", data.cicd_tools, toArray);
+  setIfEmpty("testing_frameworks", data.testing_frameworks, toArray);
+  setIfEmpty("paid_tools", data.paid_tools, toArray);
+  setIfEmpty("industries", data.industries, toArray);
+
+  return { fields, fieldsUpdated };
 }
 
 // ── Route handler ──
@@ -100,16 +235,19 @@ export async function POST(request: NextRequest) {
   const { developerId } = (await request.json()) as { developerId: string };
 
   if (!developerId) {
-    return NextResponse.json({ error: "developerId required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "developerId required" },
+      { status: 400 }
+    );
   }
 
   const serviceClient = createServiceClient();
 
-  // Fetch developer record
+  // Fetch developer record with all fields we might update
   const { data: dev, error: fetchError } = await serviceClient
     .from("developers")
     .select(
-      "id, linkedin_url, job_title, current_company, city, state_region, country, years_experience, languages, frameworks, cloud_platforms, databases, profiles!inner(full_name, email)"
+      "*, profiles!inner(full_name, email)"
     )
     .eq("id", developerId)
     .single();
@@ -129,20 +267,25 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Query LinkedIn via AgentQL
-  let profileData;
+  const profile = dev.profiles as unknown as {
+    full_name: string;
+    email: string;
+  };
+
+  // Step 1: Scrape LinkedIn via AgentQL
+  let rawProfile: LinkedInRawProfile | null;
   try {
-    profileData = await queryLinkedInProfile(linkedinUrl);
+    rawProfile = await scrapeLinkedInProfile(linkedinUrl);
   } catch (err) {
     console.error(`[LinkedInEnrich] AgentQL error for ${developerId}:`, err);
     return NextResponse.json({
       status: "failed",
-      error: err instanceof Error ? err.message : "AgentQL query failed",
+      error: err instanceof Error ? err.message : "AgentQL scrape failed",
       fieldsUpdated: [],
     });
   }
 
-  if (!profileData) {
+  if (!rawProfile) {
     return NextResponse.json({
       status: "failed",
       error: "No profile data returned from AgentQL",
@@ -150,82 +293,55 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Build update fields — only fill empty fields
-  const fields: Record<string, unknown> = {};
-  const fieldsUpdated: string[] = [];
+  // Step 2: Store raw profile in DB
+  await serviceClient
+    .from("developers")
+    .update({ linkedin_raw_profile: rawProfile })
+    .eq("id", developerId);
 
-  // Job title: prefer jobTitle, fall back to headline
-  if (!dev.job_title && (profileData.jobTitle || profileData.headline)) {
-    fields.job_title = profileData.jobTitle || profileData.headline;
-    fieldsUpdated.push("job_title");
+  // Step 3: Extract structured fields with Claude
+  let claudeData: Record<string, unknown>;
+  try {
+    claudeData = await extractFieldsFromLinkedIn(
+      rawProfile,
+      profile.full_name,
+      profile.email
+    );
+  } catch (err) {
+    console.error(
+      `[LinkedInEnrich] Claude extraction failed for ${developerId}:`,
+      err
+    );
+    // Raw profile is saved — return partial success
+    return NextResponse.json({
+      status: "partial",
+      fieldsUpdated: ["linkedin_raw_profile"],
+      message: "Profile scraped but Claude extraction failed. Raw data saved.",
+    });
   }
 
-  if (!dev.current_company && profileData.company) {
-    fields.current_company = profileData.company;
-    fieldsUpdated.push("current_company");
-  }
-
-  // Location
-  if (profileData.location && (!dev.city || !dev.country)) {
-    const loc = parseLocation(profileData.location);
-    if (!dev.city && loc.city) {
-      fields.city = loc.city;
-      fieldsUpdated.push("city");
-    }
-    if (!dev.state_region && loc.stateRegion) {
-      fields.state_region = loc.stateRegion;
-      fieldsUpdated.push("state_region");
-    }
-    if (!dev.country && loc.country) {
-      fields.country = loc.country;
-      fieldsUpdated.push("country");
+  // Check if developer has never logged in — if so, overwrite job title & company
+  const overwriteKeys = new Set<string>();
+  const profileId = dev.profile_id as string;
+  if (profileId) {
+    const { data: authData } = await serviceClient.auth.admin.getUserById(profileId);
+    if (!authData?.user?.last_sign_in_at) {
+      overwriteKeys.add("job_title");
+      overwriteKeys.add("current_company");
     }
   }
 
-  // Years of experience
-  if (!dev.years_experience && profileData.experienceYears) {
-    fields.years_experience = profileData.experienceYears;
-    fieldsUpdated.push("years_experience");
-  }
-
-  // Skills → languages, frameworks, cloud_platforms, databases
-  if (profileData.skills.length > 0) {
-    const classified = classifySkills(profileData.skills);
-
-    const existingLangs = (dev.languages as string[] | null) ?? [];
-    if (existingLangs.length === 0 && classified.languages.length > 0) {
-      fields.languages = classified.languages;
-      fieldsUpdated.push("languages");
-    }
-
-    const existingFrameworks = (dev.frameworks as string[] | null) ?? [];
-    if (existingFrameworks.length === 0 && classified.frameworks.length > 0) {
-      fields.frameworks = classified.frameworks;
-      fieldsUpdated.push("frameworks");
-    }
-
-    const existingCloud = (dev.cloud_platforms as string[] | null) ?? [];
-    if (existingCloud.length === 0 && classified.cloudPlatforms.length > 0) {
-      fields.cloud_platforms = classified.cloudPlatforms;
-      fieldsUpdated.push("cloud_platforms");
-    }
-
-    const existingDb = (dev.databases as string[] | null) ?? [];
-    if (existingDb.length === 0 && classified.databases.length > 0) {
-      fields.databases = classified.databases;
-      fieldsUpdated.push("databases");
-    }
-  }
+  // Step 4: Map to DB fields, only filling empty ones (except overwriteKeys)
+  const { fields, fieldsUpdated } = buildDevFields(claudeData, dev, overwriteKeys);
 
   if (Object.keys(fields).length === 0) {
     return NextResponse.json({
       status: "partial",
-      fieldsUpdated: [],
-      message: "No empty fields to fill",
+      fieldsUpdated: ["linkedin_raw_profile"],
+      message: "Profile scraped but no empty fields to fill",
     });
   }
 
-  // Always update last_enriched_at
   fields.last_enriched_at = new Date().toISOString();
 
   const { error: updateError } = await serviceClient
@@ -234,26 +350,28 @@ export async function POST(request: NextRequest) {
     .eq("id", developerId);
 
   if (updateError) {
-    console.error(`[LinkedInEnrich] Update failed for ${developerId}:`, updateError.message);
+    console.error(
+      `[LinkedInEnrich] Update failed for ${developerId}:`,
+      updateError.message
+    );
     return NextResponse.json({
       status: "failed",
       error: updateError.message,
-      fieldsUpdated: [],
+      fieldsUpdated: ["linkedin_raw_profile"],
     });
   }
 
-  const profile = dev.profiles as unknown as { full_name: string };
   console.log(
     `[LinkedInEnrich] Enriched ${profile.full_name}: ${fieldsUpdated.join(", ")}`
   );
 
   logDeveloperActivity(serviceClient, developerId, user.id, "enriched", {
-    fields_updated: fieldsUpdated,
+    fields_updated: [...fieldsUpdated, "linkedin_raw_profile"],
     source: "linkedin_agentql",
   });
 
   return NextResponse.json({
     status: "enriched",
-    fieldsUpdated,
+    fieldsUpdated: [...fieldsUpdated, "linkedin_raw_profile"],
   });
 }

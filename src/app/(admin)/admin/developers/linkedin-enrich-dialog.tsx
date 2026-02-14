@@ -35,7 +35,7 @@ interface LinkedinEnrichDialogProps {
   onComplete: () => void;
 }
 
-const DELAY_BETWEEN_MS = 8000;
+const DELAY_BETWEEN_MS = 10000;
 
 export function LinkedinEnrichDialog({
   open,
@@ -152,7 +152,7 @@ export function LinkedinEnrichDialog({
   function handleClose() {
     abortRef.current = true;
     onOpenChange(false);
-    if (items.some((i) => i.status === "enriched")) {
+    if (items.some((i) => i.status === "enriched" || i.status === "partial")) {
       onComplete();
       router.refresh();
     }
@@ -252,7 +252,7 @@ function StatusBadge({ item }: { item: DevStatus }) {
     case "processing":
       return (
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Enriching...
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Scraping LinkedIn...
         </span>
       );
     case "enriched":
@@ -265,7 +265,7 @@ function StatusBadge({ item }: { item: DevStatus }) {
     case "partial":
       return (
         <span className="flex items-center gap-1 text-xs text-amber-600">
-          <AlertCircle className="h-3.5 w-3.5" /> No empty fields
+          <AlertCircle className="h-3.5 w-3.5" /> Scraped (no new fields)
         </span>
       );
     case "no_linkedin":
