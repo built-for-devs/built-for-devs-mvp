@@ -87,7 +87,7 @@ export function ContactTable({ groupId }: { groupId: string }) {
       else setLoading(true);
 
       try {
-        let url = `/api/admin/folk/people?groupId=${groupId}&limit=10`;
+        let url = `/api/admin/folk/people?groupId=${groupId}&limit=50`;
         if (cursor) url += `&cursor=${cursor}`;
         if (activeFilter) url += `&titleFilter=${encodeURIComponent(activeFilter)}`;
         if (!emailOnly) url += `&emailOnly=false`;
@@ -116,6 +116,13 @@ export function ContactTable({ groupId }: { groupId: string }) {
   useEffect(() => {
     fetchContacts();
   }, [fetchContacts]);
+
+  // Auto-load all remaining contacts when sorting by LinkedIn presence
+  useEffect(() => {
+    if (sortBy === "has-linkedin-first" && nextCursor && !loadingMore) {
+      fetchContacts(nextCursor);
+    }
+  }, [sortBy, nextCursor, loadingMore, fetchContacts]);
 
   function applyPreset(value: string) {
     if (activeFilter === value) {
