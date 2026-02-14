@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { sendEmail, getAppUrl } from "@/lib/email";
 import { CompanyPaymentConfirmationEmail } from "@/lib/email/templates/company-payment-confirmation";
 import { ScoreBuyConfirmationEmail } from "@/lib/email/templates/score-buy-confirmation";
+import { HomepageBuyConfirmationEmail } from "@/lib/email/templates/homepage-buy-confirmation";
 import type Stripe from "stripe";
 
 // Use service role client to bypass RLS for webhook updates
@@ -66,11 +67,11 @@ export async function POST(request: NextRequest) {
     console.log(`Project ${projectId} marked as paid via Stripe webhook`);
 
     // Send payment confirmation email (best-effort)
-    const isQuickBuy = session.metadata?.source === "quick_buy";
+    const source = session.metadata?.source;
     const scoreId = session.metadata?.score_id;
 
     try {
-      if (isQuickBuy && scoreId) {
+      if (source === "quick_buy" && scoreId) {
         // Quick buy flow: look up email from score
         const { data: score } = await supabase
           .from("scores")
@@ -107,6 +108,30 @@ export async function POST(request: NextRequest) {
             .from("score_leads")
             .update({ follow_up_status: "converted" })
             .eq("email", email);
+        }
+      } else if (source === "homepage_buy") {
+        // Homepage buy flow: look up email from project
+        const { data: proj } = await supabase
+          .from("projects")
+          .select("product_name, num_evaluations, total_price, buyer_email, buyer_name")
+          .eq("id", projectId)
+          .single();
+
+        if (proj?.buyer_email) {
+          await sendEmail({
+            to: proj.buyer_email,
+            subject: `Your developer evaluations for ${proj.product_name ?? "your product"} are booked`,
+            react: HomepageBuyConfirmationEmail({
+              recipientName: proj.buyer_name || "there",
+              productName: proj.product_name ?? "your product",
+              numEvaluations: proj.num_evaluations ?? 1,
+              totalPrice: proj.total_price ?? 399,
+              signupUrl: `${getAppUrl()}/signup`,
+            }),
+            type: "homepage_buy_confirmation",
+            replyTo: "tessa@builtfor.dev",
+            projectId,
+          });
         }
       } else {
         // Standard company flow: look up email from company
