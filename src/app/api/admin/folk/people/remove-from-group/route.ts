@@ -8,21 +8,39 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function folkFetchWithRetry(
   url: string,
   init: RequestInit,
-  maxRetries = 3
+  maxRetries = 2
 ): Promise<Response> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const res = await fetch(url, init);
-    if (res.status === 429) {
-      const retryAfter = res.headers.get("retry-after");
-      const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000 * (attempt + 1);
-      console.log(`[RemoveFromGroup] 429 rate limited, waiting ${waitMs}ms before retry ${attempt + 1}`);
-      await sleep(waitMs);
-      continue;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const res = await fetch(url, { ...init, signal: controller.signal });
+      clearTimeout(timeout);
+      if (res.status === 429) {
+        const retryAfter = res.headers.get("retry-after");
+        const waitMs = retryAfter ? Math.min(parseInt(retryAfter, 10) * 1000, 5000) : 2000;
+        console.log(`[RemoveFromGroup] 429 rate limited, waiting ${waitMs}ms before retry ${attempt + 1}`);
+        await sleep(waitMs);
+        continue;
+      }
+      return res;
+    } catch (err) {
+      clearTimeout(timeout);
+      if (attempt === maxRetries) throw err;
+      await sleep(1000);
     }
-    return res;
   }
-  // Final attempt without retry
-  return fetch(url, init);
+  // Final attempt with timeout
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    clearTimeout(timeout);
+    return res;
+  } catch (err) {
+    clearTimeout(timeout);
+    throw err;
+  }
 }
 
 export const maxDuration = 60;

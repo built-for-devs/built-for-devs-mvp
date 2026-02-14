@@ -189,14 +189,24 @@ export function ContactTable({ groupId }: { groupId: string }) {
 
   async function removeFromGroup(ids: string[]) {
     setDeleting((prev) => new Set([...prev, ...ids]));
+    setError(null);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
     try {
       const res = await fetch("/api/admin/folk/people/remove-from-group", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ personIds: ids, groupId }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        setError(`Remove failed (${res.status}): ${text || "server error"}`);
+        return;
+      }
       const data = await res.json();
-      if (res.ok && data.removed > 0) {
+      if (data.removed > 0) {
         setContacts((prev) => prev.filter((c) => !ids.includes(c.id)));
         setSelected((prev) => {
           const next = new Set(prev);
@@ -208,14 +218,20 @@ export function ContactTable({ groupId }: { groupId: string }) {
         console.error("Remove from group errors:", data.errors);
         setError(`Failed to remove some contacts: ${data.errors.join(", ")}`);
       }
-    } catch {
-      setError("Failed to remove contacts from group");
+    } catch (err) {
+      clearTimeout(timeout);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("Request timed out — Folk API may be slow. Try again.");
+      } else {
+        setError("Failed to remove contacts from group");
+      }
+    } finally {
+      setDeleting((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      });
     }
-    setDeleting((prev) => {
-      const next = new Set(prev);
-      for (const id of ids) next.delete(id);
-      return next;
-    });
   }
 
   async function removeFromFolk(ids: string[]) {
@@ -301,15 +317,20 @@ export function ContactTable({ groupId }: { groupId: string }) {
         </div>
       </div>
 
+      {error && !loading && (
+        <div className="flex items-center justify-between rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="ml-2 hover:opacity-70">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-12 animate-pulse rounded-md bg-muted" />
           ))}
-        </div>
-      ) : error ? (
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
         </div>
       ) : contacts.length === 0 ? (
         <div className="rounded-md border p-8 text-center">
