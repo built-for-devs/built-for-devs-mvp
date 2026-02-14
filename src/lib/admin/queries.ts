@@ -172,9 +172,14 @@ export async function getDevelopersWithProfiles(
     query = query.or(`country.ilike.${loc},state_region.ilike.${loc},city.ilike.${loc}`);
   }
 
-  // Boolean filter
+  // Boolean filters
   if (filters.is_available !== undefined) {
     query = query.eq("is_available", filters.is_available);
+  }
+  if (filters.has_github === true) {
+    query = query.not("github_url", "is", null);
+  } else if (filters.has_github === false) {
+    query = query.is("github_url", null);
   }
 
   // Enum filters — cast through `any` because filter values arrive as plain strings

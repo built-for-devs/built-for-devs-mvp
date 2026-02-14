@@ -83,6 +83,17 @@ export function DeveloperFilterPanel() {
         />
       </div>
 
+      {/* GitHub filter */}
+      <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
+        <Label className="text-xs whitespace-nowrap">Has GitHub</Label>
+        <Switch
+          checked={filters.has_github === true}
+          onCheckedChange={(checked) =>
+            updateParam("has_github", checked ? "true" : undefined)
+          }
+        />
+      </div>
+
       {/* Experience range */}
       <div className="flex items-center gap-1 rounded-md border px-3 py-1.5">
         <Label className="text-xs whitespace-nowrap">Exp:</Label>
