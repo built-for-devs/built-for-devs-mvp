@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table";
 import { ImportDialog } from "./import-dialog";
 
-type SortOption = "default" | "name-asc" | "name-desc" | "not-enriched-first" | "enriched-first";
+type SortOption = "default" | "name-asc" | "name-desc" | "not-enriched-first" | "enriched-first" | "has-linkedin-first";
 
 interface FolkContactView {
   id: string;
@@ -179,6 +179,8 @@ export function ContactTable({ groupId }: { groupId: string }) {
         return statusOrder[a.enrichmentStatus] - statusOrder[b.enrichmentStatus] || nameA.localeCompare(nameB);
       case "enriched-first":
         return statusOrder[b.enrichmentStatus] - statusOrder[a.enrichmentStatus] || nameA.localeCompare(nameB);
+      case "has-linkedin-first":
+        return (b.linkedinUrl ? 1 : 0) - (a.linkedinUrl ? 1 : 0) || nameA.localeCompare(nameB);
       default:
         return 0;
     }
@@ -242,6 +244,7 @@ export function ContactTable({ groupId }: { groupId: string }) {
               <SelectItem value="name-asc">Name A-Z</SelectItem>
               <SelectItem value="name-desc">Name Z-A</SelectItem>
               <SelectItem value="not-enriched-first">Not Enriched First</SelectItem>
+              <SelectItem value="has-linkedin-first">Has LinkedIn First</SelectItem>
               <SelectItem value="enriched-first">Enriched First</SelectItem>
               <SelectItem value="default">Folk Default</SelectItem>
             </SelectContent>
