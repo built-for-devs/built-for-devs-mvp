@@ -69,6 +69,7 @@ interface EditDeveloperDialogProps {
     linkedin_url: string | null;
     github_url: string | null;
     twitter_url: string | null;
+    devto_url?: string | null;
     website_url: string | null;
     country: string | null;
     state_region: string | null;
@@ -118,6 +119,7 @@ export function EditDeveloperDialog({ developer }: EditDeveloperDialogProps) {
   const [linkedinUrl, setLinkedinUrl] = useState(developer.linkedin_url ?? "");
   const [githubUrl, setGithubUrl] = useState(developer.github_url ?? "");
   const [twitterUrl, setTwitterUrl] = useState(developer.twitter_url ?? "");
+  const [devtoUrl, setDevtoUrl] = useState(developer.devto_url ?? "");
   const [websiteUrl, setWebsiteUrl] = useState(developer.website_url ?? "");
 
   // -- Demographics --
@@ -151,6 +153,7 @@ export function EditDeveloperDialog({ developer }: EditDeveloperDialogProps) {
     setLinkedinUrl(developer.linkedin_url ?? "");
     setGithubUrl(developer.github_url ?? "");
     setTwitterUrl(developer.twitter_url ?? "");
+    setDevtoUrl(developer.devto_url ?? "");
     setWebsiteUrl(developer.website_url ?? "");
     setCity(developer.city ?? "");
     setStateRegion(developer.state_region ?? "");
@@ -177,6 +180,7 @@ export function EditDeveloperDialog({ developer }: EditDeveloperDialogProps) {
         ["linkedin_url", linkedinUrl],
         ["github_url", githubUrl],
         ["twitter_url", twitterUrl],
+        ["devto_url", devtoUrl],
         ["website_url", websiteUrl],
         ["paypal_email", paypalEmail],
       ];
@@ -379,6 +383,10 @@ export function EditDeveloperDialog({ developer }: EditDeveloperDialogProps) {
                 <div className="space-y-1.5">
                   <Label className="text-xs">Twitter URL</Label>
                   <Input value={twitterUrl} onChange={(e) => setTwitterUrl(e.target.value)} placeholder="https://twitter.com/..." />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Dev.to URL</Label>
+                  <Input value={devtoUrl} onChange={(e) => setDevtoUrl(e.target.value)} placeholder="https://dev.to/..." />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Website URL</Label>

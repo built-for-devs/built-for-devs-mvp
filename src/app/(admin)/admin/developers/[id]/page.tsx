@@ -129,6 +129,7 @@ export default async function AdminDeveloperDetailPage({
                 <LinkField label="LinkedIn" value={dev.linkedin_url} />
                 <LinkField label="GitHub" value={dev.github_url} />
                 <LinkField label="Twitter" value={dev.twitter_url} />
+                <LinkField label="Dev.to" value={(dev as Record<string, unknown>).devto_url as string | null} />
                 <LinkField label="Website" value={dev.website_url} />
                 <Field label="Personal Email" value={dev.personal_email} />
                 <Field label="Alternative Emails" value={(dev as Record<string, unknown>).alternative_emails as string[] | null} />

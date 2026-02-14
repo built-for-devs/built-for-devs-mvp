@@ -55,6 +55,7 @@ export interface EnrichmentData {
   githubBlog: string | null;
   twitterUsername: string | null;
   linkedinUrl: string | null;
+  devtoUrl: string | null;
   openSourceActivity: string | null;
 }
 
@@ -70,6 +71,7 @@ interface GitHubProfile {
   blog: string | null;
   twitterUsername: string | null;
   linkedinUrl: string | null;
+  devtoUrl: string | null;
   publicRepos: number;
   followers: number;
   createdAt: string;
@@ -193,31 +195,43 @@ async function getGitHubProfile(
   if (!res.ok) throw new Error(`GitHub profile error (${res.status})`);
   const u = await res.json();
 
-  // Check blog field for LinkedIn URL
+  // Check blog field for LinkedIn or Dev.to URL
   let linkedinUrl: string | null = null;
+  let devtoUrl: string | null = null;
   const blog: string | null = u.blog || null;
   if (blog && blog.includes("linkedin.com")) {
     linkedinUrl = blog.startsWith("http") ? blog : `https://${blog}`;
+  } else if (blog && blog.includes("dev.to")) {
+    devtoUrl = blog.startsWith("http") ? blog : `https://${blog}`;
   }
 
-  // Fetch social accounts for LinkedIn (best-effort)
-  if (!linkedinUrl) {
-    try {
-      const socialRes = await fetch(
-        `https://api.github.com/users/${username}/social_accounts`,
-        { headers }
-      );
-      if (socialRes.ok) {
-        const accounts: { provider: string; url: string }[] = await socialRes.json();
+  // Fetch social accounts for LinkedIn and Dev.to (best-effort)
+  try {
+    const socialRes = await fetch(
+      `https://api.github.com/users/${username}/social_accounts`,
+      { headers }
+    );
+    if (socialRes.ok) {
+      const accounts: { provider: string; url: string }[] = await socialRes.json();
+      if (!linkedinUrl) {
         const linkedin = accounts.find(
           (a) => a.provider === "linkedin" || a.url.includes("linkedin.com")
         );
         if (linkedin) linkedinUrl = linkedin.url;
       }
-    } catch {
-      // Non-fatal — social accounts endpoint may not be available
+      if (!devtoUrl) {
+        const devto = accounts.find((a) => a.url.includes("dev.to"));
+        if (devto) devtoUrl = devto.url;
+      }
     }
+  } catch {
+    // Non-fatal — social accounts endpoint may not be available
   }
+
+  // Clean up blog: don't store LinkedIn or Dev.to as blog
+  const cleanBlog = (linkedinUrl || devtoUrl) && blog && (blog.includes("linkedin.com") || blog.includes("dev.to"))
+    ? null
+    : blog;
 
   return {
     login: u.login,
@@ -226,9 +240,10 @@ async function getGitHubProfile(
     company: u.company ?? null,
     location: u.location ?? null,
     bio: u.bio ?? null,
-    blog: linkedinUrl ? null : blog, // Don't store LinkedIn as blog
+    blog: cleanBlog,
     twitterUsername: u.twitter_username ?? null,
     linkedinUrl,
+    devtoUrl,
     publicRepos: u.public_repos ?? 0,
     followers: u.followers ?? 0,
     createdAt: u.created_at,
@@ -474,6 +489,7 @@ Return ONLY the JSON object, no markdown fences or extra text.`;
     githubBlog: profile?.blog ?? null,
     twitterUsername: profile?.twitterUsername ?? null,
     linkedinUrl: profile?.linkedinUrl ?? null,
+    devtoUrl: profile?.devtoUrl ?? null,
     openSourceActivity: ossActivity,
   };
 }

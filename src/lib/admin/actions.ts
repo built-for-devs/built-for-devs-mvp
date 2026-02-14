@@ -997,7 +997,7 @@ export async function mergeDevelopers(
   const mergedFields: string[] = [];
   const stringFields = [
     "job_title", "current_company", "country", "state_region", "city",
-    "timezone", "linkedin_url", "github_url", "twitter_url", "website_url",
+    "timezone", "linkedin_url", "github_url", "twitter_url", "devto_url", "website_url",
     "personal_email", "paypal_email", "seniority", "company_size",
     "buying_influence", "open_source_activity", "folk_person_id", "folk_group_id",
   ] as const;

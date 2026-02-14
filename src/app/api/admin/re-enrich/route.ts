@@ -37,6 +37,7 @@ function buildDevFields(data: EnrichmentData): Record<string, unknown> {
     fields.twitter_url = `https://x.com/${data.twitterUsername}`;
   }
   if (data.linkedinUrl) fields.linkedin_url = data.linkedinUrl;
+  if (data.devtoUrl) fields.devto_url = data.devtoUrl;
   if (data.openSourceActivity) {
     if (VALID_OSS_ACTIVITY.includes(data.openSourceActivity as (typeof VALID_OSS_ACTIVITY)[number])) {
       fields.open_source_activity = data.openSourceActivity;
