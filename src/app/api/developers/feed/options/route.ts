@@ -92,12 +92,14 @@ export async function GET() {
 
   const options: Record<string, string[]> = {};
 
-  // Merge static base options + any custom values from the database
+  // Merge static base options + any custom values from the database.
+  // Normalize to lowercase to avoid case-sensitive duplicates (e.g. "laravel" vs "Laravel").
+  // Display formatting is handled by formatEnumLabel on the client.
   for (const col of arrayColumns) {
     const valueSet = new Set<string>(baseOptions[col] ?? []);
     for (const row of rows) {
       const arr = row[col] as string[] | null;
-      if (arr) arr.forEach((v) => valueSet.add(v));
+      if (arr) arr.forEach((v) => valueSet.add(v.toLowerCase()));
     }
     options[col] = Array.from(valueSet).sort();
   }
@@ -106,7 +108,7 @@ export async function GET() {
     const valueSet = new Set<string>(baseOptions[col] ?? []);
     for (const row of rows) {
       const val = row[col] as string | null;
-      if (val) valueSet.add(val);
+      if (val) valueSet.add(val.toLowerCase());
     }
     options[col] = Array.from(valueSet).sort();
   }

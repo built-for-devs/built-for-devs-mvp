@@ -67,7 +67,7 @@ function buildDevFields(data: EnrichmentData): Record<string, unknown> {
   }
 
   const toArray = (csv: string | null) =>
-    csv ? csv.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+    csv ? csv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean) : undefined;
 
   if (data.languages) fields.languages = toArray(data.languages);
   if (data.roleType) fields.role_types = toArray(data.roleType);

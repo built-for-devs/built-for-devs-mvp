@@ -127,7 +127,7 @@ async function syncToBfd(
   }
 
   const toArray = (csv: string | null) =>
-    csv ? csv.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+    csv ? csv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean) : undefined;
 
   if (result.data.languages) devFields.languages = toArray(result.data.languages);
   if (result.data.roleType) devFields.role_types = toArray(result.data.roleType);
