@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Try Serper Google search
     try {
-      const username = await searchGitHubProfile(profile.full_name, dev.current_company);
+      const username = await searchGitHubProfile(profile.full_name, dev.current_company, dev.linkedin_url);
       if (username) {
         const githubUrl = `https://github.com/${username}`;
         await serviceClient
