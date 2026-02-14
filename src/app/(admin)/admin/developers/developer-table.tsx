@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, EyeOff, FolderPlus, GitMerge, Loader2, Search, Sparkles, Trash2, XCircle } from "lucide-react";
+import { CheckCircle, EyeOff, FolderPlus, GitMerge, Linkedin, Loader2, Search, Sparkles, Trash2, XCircle } from "lucide-react";
 import { deleteDevelopersInBulk } from "@/lib/admin/actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { DeveloperRowEditor } from "./developer-row-editor";
 import { BulkProjectDialog } from "./bulk-project-dialog";
 import { EnrichDialog } from "./enrich-dialog";
+import { LinkedinEnrichDialog } from "./linkedin-enrich-dialog";
 import { MergeDialog } from "./merge-dialog";
 
 interface DeveloperRowData {
@@ -54,6 +55,7 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
   const [anonymized, setAnonymized] = useState(false);
   const [sixtyfourOpen, setSixtyfourOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
+  const [linkedinEnrichOpen, setLinkedinEnrichOpen] = useState(false);
   const [sixtyfourSubmitting, setSixtyfourSubmitting] = useState(false);
   const [sixtyfourResults, setSixtyfourResults] = useState<
     { developerId: string; name: string; status: string; taskId?: string }[] | null
@@ -151,6 +153,14 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
             <Button
               size="sm"
               variant="outline"
+              onClick={() => setLinkedinEnrichOpen(true)}
+            >
+              <Linkedin className="mr-1.5 h-4 w-4" />
+              LinkedIn Enrich ({selected.size})
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               onClick={handleSixtyfourSubmit}
               disabled={sixtyfourSubmitting}
             >
@@ -238,6 +248,15 @@ export function DeveloperTable({ developers }: { developers: DeveloperRowData[] 
       <EnrichDialog
         open={enrichOpen}
         onOpenChange={setEnrichOpen}
+        developerIds={Array.from(selected)}
+        developerNames={developerNames}
+        onComplete={() => setSelected(new Set())}
+      />
+
+      {/* LinkedIn enrich dialog */}
+      <LinkedinEnrichDialog
+        open={linkedinEnrichOpen}
+        onOpenChange={setLinkedinEnrichOpen}
         developerIds={Array.from(selected)}
         developerNames={developerNames}
         onComplete={() => setSelected(new Set())}
