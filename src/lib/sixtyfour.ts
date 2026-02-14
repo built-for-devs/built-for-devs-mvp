@@ -99,7 +99,10 @@ export async function pollGitHubDiscovery(
   const status = data.status as string;
 
   if (status === "completed") {
-    const sd = data.structured_data ?? {};
+    // SixtyFour may return structured data under different keys
+    const sd = data.structured_data ?? data.result ?? data.output ?? data.data ?? {};
+    console.log(`SixtyFour completed for task ${taskId}:`, JSON.stringify(data, null, 2));
+    console.log(`SixtyFour parsed structured_data:`, JSON.stringify(sd, null, 2));
     return {
       taskId,
       status: "completed",

@@ -9,7 +9,6 @@ import {
   AlertCircle,
   Upload,
   Sparkles,
-  Clock,
   Github,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -58,7 +57,7 @@ interface ContactView {
 interface DiscoveryItem {
   developerId: string;
   name: string;
-  status: "searching" | "found" | "submitted" | "no_linkedin" | "already_has_github" | "failed";
+  status: "searching" | "found" | "not_found" | "already_has_github" | "failed";
   githubUrl?: string;
   taskId?: string;
   source?: string;
@@ -193,7 +192,7 @@ export function ImportDialog({
         const items: DiscoveryItem[] = data.results.map((r: DiscoveryItem) => ({
           developerId: r.developerId,
           name: r.name,
-          status: r.status === "submitted" ? "submitted" : r.status,
+          status: r.status,
           githubUrl: r.githubUrl,
           taskId: r.taskId,
           source: r.source,
@@ -284,7 +283,9 @@ export function ImportDialog({
   const discoveryFound = discoveryItems.filter(
     (i) => i.status === "found" || i.status === "already_has_github"
   ).length;
-  const sixtyfourPending = discoveryItems.filter((i) => i.status === "submitted").length;
+  const discoveryNotFound = discoveryItems.filter(
+    (i) => i.status === "not_found" || i.status === "failed"
+  ).length;
   const enrichedCount = enrichItems.filter((i) => i.status === "enriched").length;
   const partialCount = enrichItems.filter((i) => i.status === "partial").length;
   const failedCount = enrichItems.filter((i) => i.status === "failed").length;
@@ -462,15 +463,9 @@ export function ImportDialog({
                 {discoveryFound > 0 && (
                   <span className="text-green-700">{discoveryFound} found</span>
                 )}
-                {sixtyfourPending > 0 && (
-                  <span className="flex items-center gap-1 text-amber-600">
-                    <Clock className="h-3.5 w-3.5" />
-                    {sixtyfourPending} pending via SixtyFour
-                  </span>
-                )}
-                {discoveryItems.filter((i) => i.status === "failed" || i.status === "no_linkedin").length > 0 && (
+                {discoveryNotFound > 0 && (
                   <span className="text-muted-foreground">
-                    {discoveryItems.filter((i) => i.status === "failed" || i.status === "no_linkedin").length} not found
+                    {discoveryNotFound} not found
                   </span>
                 )}
               </div>
@@ -570,19 +565,10 @@ function DiscoveryStatus({ item }: { item: DiscoveryItem }) {
           {item.source && <span className="text-muted-foreground">({item.source})</span>}
         </span>
       );
-    case "submitted":
-      return (
-        <span className="flex items-center gap-1 text-xs text-amber-600">
-          <Clock className="h-3.5 w-3.5" /> SixtyFour (pending)
-        </span>
-      );
-    case "no_linkedin":
-      return (
-        <span className="text-xs text-muted-foreground">No LinkedIn — needs manual</span>
-      );
+    case "not_found":
     case "failed":
       return (
-        <span className="flex items-center gap-1 text-xs text-red-600">
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
           <XCircle className="h-3.5 w-3.5" /> Not found
         </span>
       );

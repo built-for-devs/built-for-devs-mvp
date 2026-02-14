@@ -9,7 +9,6 @@ import {
   AlertCircle,
   Search,
   Sparkles,
-  Clock,
   Github,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,7 @@ type Phase = "confirm" | "discovering" | "enriching" | "complete";
 interface DiscoveryItem {
   developerId: string;
   name: string;
-  status: "searching" | "found" | "submitted" | "no_linkedin" | "already_has_github" | "failed";
+  status: "searching" | "found" | "not_found" | "already_has_github" | "failed";
   githubUrl?: string;
   taskId?: string;
   source?: string;
@@ -105,8 +104,6 @@ export function EnrichDialog({
 
       setDiscoveryItems(items);
 
-      // Don't poll SixtyFour — proceed to enrichment immediately.
-      // SixtyFour results are collected later via "Collect Results" on Developers page.
       startEnrichment();
     } catch {
       setDiscoveryItems((prev) =>
@@ -162,7 +159,9 @@ export function EnrichDialog({
   const discoveryFound = discoveryItems.filter(
     (i) => i.status === "found" || i.status === "already_has_github"
   ).length;
-  const sixtyfourPending = discoveryItems.filter((i) => i.status === "submitted").length;
+  const discoveryNotFound = discoveryItems.filter(
+    (i) => i.status === "not_found" || i.status === "failed"
+  ).length;
   const enrichedCount = enrichItems.filter((i) => i.status === "enriched").length;
   const partialCount = enrichItems.filter((i) => i.status === "partial").length;
   const failedCount = enrichItems.filter((i) => i.status === "failed").length;
@@ -183,8 +182,8 @@ export function EnrichDialog({
         {phase === "confirm" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              This will find GitHub profiles for each developer (via GitHub API,
-              Google search, and SixtyFour), then enrich their profiles with AI.
+              This will find GitHub profiles for each developer (via GitHub API
+              and Google search), then enrich their profiles with AI.
             </p>
 
             <div className="max-h-48 overflow-auto rounded-md bg-muted p-3 text-sm">
@@ -261,15 +260,9 @@ export function EnrichDialog({
                   {discoveryFound} found
                 </span>
               )}
-              {sixtyfourPending > 0 && (
-                <span className="flex items-center gap-1 text-amber-600">
-                  <Clock className="h-3.5 w-3.5" />
-                  {sixtyfourPending} pending via SixtyFour
-                </span>
-              )}
-              {discoveryItems.filter((i) => i.status === "failed" || i.status === "no_linkedin").length > 0 && (
+              {discoveryNotFound > 0 && (
                 <span className="text-muted-foreground">
-                  {discoveryItems.filter((i) => i.status === "failed" || i.status === "no_linkedin").length} not found
+                  {discoveryNotFound} not found
                 </span>
               )}
             </div>
@@ -295,12 +288,6 @@ export function EnrichDialog({
                 </span>
               )}
             </div>
-
-            {sixtyfourPending > 0 && (
-              <p className="text-xs text-muted-foreground">
-                SixtyFour results will be available in ~5 minutes. Use &quot;Collect SixtyFour Results&quot; on the Developers page to retrieve them, then re-enrich.
-              </p>
-            )}
 
             {/* Per-developer results */}
             <div className="max-h-64 overflow-auto space-y-1.5">
@@ -371,19 +358,10 @@ function DiscoveryStatus({ item }: { item: DiscoveryItem }) {
           {item.source && <span className="text-muted-foreground">({item.source})</span>}
         </span>
       );
-    case "submitted":
-      return (
-        <span className="flex items-center gap-1 text-xs text-amber-600">
-          <Clock className="h-3.5 w-3.5" /> SixtyFour (pending)
-        </span>
-      );
-    case "no_linkedin":
-      return (
-        <span className="text-xs text-muted-foreground">No LinkedIn — needs manual</span>
-      );
+    case "not_found":
     case "failed":
       return (
-        <span className="flex items-center gap-1 text-xs text-red-600">
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
           <XCircle className="h-3.5 w-3.5" /> Not found
         </span>
       );

@@ -77,10 +77,15 @@ export async function POST() {
           fieldsFound.push("website");
         }
 
-        await serviceClient
+        console.log(`SixtyFour collect for ${profile.full_name}: updating`, update);
+        const { error: updateError } = await serviceClient
           .from("developers")
           .update(update)
           .eq("id", dev.id);
+
+        if (updateError) {
+          console.error(`SixtyFour DB update failed for ${profile.full_name}:`, updateError);
+        }
 
         if (fieldsFound.length > 0) {
           results.push({

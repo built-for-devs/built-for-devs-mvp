@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { findGitHubUser, type EnrichmentInput } from "@/lib/enrichment";
 import { searchGitHubProfile, crawlForGitHub, findGitHubViaWebsite } from "@/lib/serper";
-import { submitGitHubDiscovery } from "@/lib/sixtyfour";
 
 export const maxDuration = 60;
 
@@ -17,7 +16,7 @@ function createServiceClient() {
 interface DiscoveryResult {
   developerId: string;
   name: string;
-  status: "found" | "submitted" | "no_linkedin" | "already_has_github" | "failed";
+  status: "found" | "not_found" | "already_has_github" | "failed";
   githubUrl?: string;
   taskId?: string;
   source?: string;
@@ -165,44 +164,11 @@ export async function POST(request: NextRequest) {
       console.error(`Website Google search failed for ${profile.full_name}:`, err);
     }
 
-    // 6. Try SixtyFour (async) if developer has LinkedIn — expensive, last resort
-    if (dev.linkedin_url) {
-      try {
-        const taskId = await submitGitHubDiscovery({
-          name: profile.full_name,
-          title: dev.job_title,
-          company: dev.current_company,
-          location: dev.city,
-          linkedin: dev.linkedin_url,
-        });
-        // Save task ID to developer record for background collection
-        await serviceClient
-          .from("developers")
-          .update({ sixtyfour_task_id: taskId })
-          .eq("id", dev.id);
-        results.push({
-          developerId: dev.id,
-          name: profile.full_name,
-          status: "submitted",
-          taskId,
-        });
-        continue;
-      } catch (err) {
-        console.error(`SixtyFour submit failed for ${profile.full_name}:`, err);
-        results.push({
-          developerId: dev.id,
-          name: profile.full_name,
-          status: "failed",
-        });
-        continue;
-      }
-    }
-
-    // 7. No LinkedIn — needs manual GitHub URL
+    // 6. Not found — needs manual GitHub URL entry
     results.push({
       developerId: dev.id,
       name: profile.full_name,
-      status: "no_linkedin",
+      status: "not_found",
     });
   }
 
