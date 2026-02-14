@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
   // Look up developer + profile data
   const { data: developers, error: fetchError } = await serviceClient
     .from("developers")
-    .select("id, job_title, current_company, linkedin_url, github_url, personal_email, alternative_emails, folk_person_id, folk_group_id, profiles!inner(full_name, email)")
+    .select("id, job_title, current_company, linkedin_url, github_url, personal_email, alternative_emails, folk_person_id, folk_group_id, linkedin_raw_profile, profiles!inner(full_name, email)")
     .in("id", developerIds);
 
   if (fetchError || !developers) {
@@ -119,6 +119,10 @@ export async function POST(request: NextRequest) {
   for (const dev of developers) {
     const profile = dev.profiles as unknown as { full_name: string; email: string };
 
+    // Extract LinkedIn text from stored raw profile (if previously scraped)
+    const rawProfile = dev.linkedin_raw_profile as { text?: string } | null;
+    const linkedinText = rawProfile?.text ?? null;
+
     const result = await reEnrichDeveloper({
       name: profile.full_name,
       email: profile.email,
@@ -126,6 +130,7 @@ export async function POST(request: NextRequest) {
       jobTitle: dev.job_title,
       company: dev.current_company,
       githubUrl: dev.github_url,
+      linkedinText,
     });
 
     if (result.status !== "failed" && result.data) {

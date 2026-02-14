@@ -339,7 +339,8 @@ async function extractWithClaude(
   profile: GitHubProfile | null,
   repoData: GitHubRepoData | null,
   input: EnrichmentInput,
-  readme?: string | null
+  readme?: string | null,
+  linkedinText?: string | null
 ): Promise<EnrichmentData> {
   // Build ranked language list from GitHub
   const rankedLanguages = repoData
@@ -394,6 +395,10 @@ async function extractWithClaude(
 
   if (readme) {
     contextParts.push(`\nGitHub Profile README:\n${readme}`);
+  }
+
+  if (linkedinText) {
+    contextParts.push(`\nLinkedIn profile text (previously scraped):\n${linkedinText}`);
   }
 
   const prompt = `Analyze this developer's profile data and return a JSON object with the following fields.
@@ -634,6 +639,7 @@ export async function reEnrichDeveloper(input: {
   jobTitle?: string | null;
   company?: string | null;
   githubUrl?: string | null;
+  linkedinText?: string | null;
 }): Promise<{ status: "enriched" | "partial" | "failed"; data?: EnrichmentData; error?: string; githubEmail?: string }> {
   try {
     // If we already have their GitHub URL, extract username directly
@@ -677,7 +683,7 @@ export async function reEnrichDeveloper(input: {
       linkedinUrl: input.linkedinUrl,
       jobTitle: input.jobTitle,
       company: input.company,
-    }, readme);
+    }, readme, input.linkedinText);
 
     const filled = Object.values(data).filter((v) => v != null).length;
     if (filled === 0) {

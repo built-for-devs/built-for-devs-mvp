@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { scrapeLinkedInProfile, type LinkedInRawProfile } from "@/lib/agentql";
+import { scrapeLinkedInProfile } from "@/lib/agentql";
 import { logDeveloperActivity } from "@/lib/admin/activity-log";
 
 export const maxDuration = 120;
@@ -22,63 +22,23 @@ function getAnthropic() {
   return _anthropic;
 }
 
-// ── Claude extraction from LinkedIn profile ──
+// ── Claude extraction from raw LinkedIn page text ──
 
-async function extractFieldsFromLinkedIn(
-  rawProfile: LinkedInRawProfile,
+async function extractFieldsFromLinkedInText(
+  pageText: string,
   existingName: string,
   existingEmail: string | null
 ): Promise<Record<string, unknown>> {
-  // Build context from the raw LinkedIn profile
   const contextParts: string[] = [];
-  contextParts.push(`Person: ${existingName}`);
-  if (existingEmail) contextParts.push(`Email: ${existingEmail}`);
+  contextParts.push(`Person we're looking up: ${existingName}`);
+  if (existingEmail) contextParts.push(`Known email: ${existingEmail}`);
+  contextParts.push(
+    `\nBelow is the rendered text content from their LinkedIn profile page:\n`
+  );
+  contextParts.push(pageText);
 
-  if (rawProfile.full_name) contextParts.push(`LinkedIn Name: ${rawProfile.full_name}`);
-  if (rawProfile.headline) contextParts.push(`Headline: ${rawProfile.headline}`);
-  if (rawProfile.location) contextParts.push(`Location: ${rawProfile.location}`);
-
-  if (rawProfile.about) {
-    contextParts.push(`\nAbout section:\n${rawProfile.about}`);
-  }
-
-  if (rawProfile.experience.length > 0) {
-    contextParts.push(`\nWork Experience:`);
-    for (const exp of rawProfile.experience) {
-      const parts = [exp.title, exp.company, exp.date_range, exp.location]
-        .filter(Boolean)
-        .join(" | ");
-      contextParts.push(`  - ${parts}`);
-      if (exp.description) {
-        contextParts.push(`    ${exp.description}`);
-      }
-    }
-  }
-
-  if (rawProfile.education.length > 0) {
-    contextParts.push(`\nEducation:`);
-    for (const edu of rawProfile.education) {
-      const parts = [edu.school, edu.degree, edu.field_of_study, edu.date_range]
-        .filter(Boolean)
-        .join(" | ");
-      contextParts.push(`  - ${parts}`);
-    }
-  }
-
-  if (rawProfile.skills.length > 0) {
-    contextParts.push(`\nSkills: ${rawProfile.skills.join(", ")}`);
-  }
-
-  if (rawProfile.certifications.length > 0) {
-    contextParts.push(`\nCertifications: ${rawProfile.certifications.join(", ")}`);
-  }
-
-  if (rawProfile.languages.length > 0) {
-    contextParts.push(`\nLanguages spoken: ${rawProfile.languages.join(", ")}`);
-  }
-
-  const prompt = `Analyze this developer's LinkedIn profile data and return a JSON object with the following fields.
-Use ONLY the data provided — do not make up information. If a field cannot be determined, use null.
+  const prompt = `Analyze this LinkedIn profile page text and return a JSON object with the following fields.
+Use ONLY the data visible in the text — do not make up information. If a field cannot be determined from the text, use null.
 
 ${contextParts.join("\n")}
 
@@ -124,7 +84,7 @@ Return ONLY the JSON object, no markdown fences or extra text.`;
   return JSON.parse(cleaned);
 }
 
-// ── Map Claude output to DB fields (same logic as re-enrich buildDevFields) ──
+// ── Map Claude output to DB fields ──
 
 function buildDevFields(
   data: Record<string, unknown>,
@@ -148,7 +108,6 @@ function buildDevFields(
       ? csv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
       : undefined;
 
-  // Only fill empty fields (unless key is in overwriteKeys)
   function setIfEmpty(
     dbKey: string,
     value: unknown,
@@ -243,7 +202,7 @@ export async function POST(request: NextRequest) {
 
   const serviceClient = createServiceClient();
 
-  // Fetch developer record with all fields we might update
+  // Fetch developer record
   const { data: dev, error: fetchError } = await serviceClient
     .from("developers")
     .select(
@@ -272,38 +231,30 @@ export async function POST(request: NextRequest) {
     email: string;
   };
 
-  // Step 1: Scrape LinkedIn via AgentQL
-  let rawProfile: LinkedInRawProfile | null;
+  // Step 1: Scrape LinkedIn via authenticated remote browser
+  let scrapedResult: Awaited<ReturnType<typeof scrapeLinkedInProfile>>;
   try {
-    rawProfile = await scrapeLinkedInProfile(linkedinUrl);
+    scrapedResult = await scrapeLinkedInProfile(linkedinUrl);
   } catch (err) {
-    console.error(`[LinkedInEnrich] AgentQL error for ${developerId}:`, err);
+    console.error(`[LinkedInEnrich] Scrape error for ${developerId}:`, err);
     return NextResponse.json({
       status: "failed",
-      error: err instanceof Error ? err.message : "AgentQL scrape failed",
+      error: err instanceof Error ? err.message : "LinkedIn scrape failed",
       fieldsUpdated: [],
     });
   }
 
-  if (!rawProfile) {
-    return NextResponse.json({
-      status: "failed",
-      error: "No profile data returned from AgentQL",
-      fieldsUpdated: [],
-    });
-  }
-
-  // Step 2: Store raw profile in DB
+  // Step 2: Store raw scraped text in DB for future re-processing
   await serviceClient
     .from("developers")
-    .update({ linkedin_raw_profile: rawProfile })
+    .update({ linkedin_raw_profile: scrapedResult })
     .eq("id", developerId);
 
   // Step 3: Extract structured fields with Claude
   let claudeData: Record<string, unknown>;
   try {
-    claudeData = await extractFieldsFromLinkedIn(
-      rawProfile,
+    claudeData = await extractFieldsFromLinkedInText(
+      scrapedResult.text,
       profile.full_name,
       profile.email
     );
@@ -312,11 +263,10 @@ export async function POST(request: NextRequest) {
       `[LinkedInEnrich] Claude extraction failed for ${developerId}:`,
       err
     );
-    // Raw profile is saved — return partial success
     return NextResponse.json({
       status: "partial",
       fieldsUpdated: ["linkedin_raw_profile"],
-      message: "Profile scraped but Claude extraction failed. Raw data saved.",
+      message: "Profile scraped but Claude extraction failed. Raw text saved.",
     });
   }
 

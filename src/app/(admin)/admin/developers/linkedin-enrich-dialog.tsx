@@ -107,6 +107,11 @@ export function LinkedinEnrichDialog({
               : item
           )
         );
+
+        // Stop all processing if auth error (cookie expired — all subsequent will fail too)
+        if (data.error?.includes("authentication") || data.error?.includes("li_at")) {
+          abortRef.current = true;
+        }
       } catch (err) {
         setItems((prev) =>
           prev.map((item) =>
@@ -276,8 +281,9 @@ function StatusBadge({ item }: { item: DevStatus }) {
       );
     case "failed":
       return (
-        <span className="flex items-center gap-1 text-xs text-red-600">
-          <XCircle className="h-3.5 w-3.5" /> Failed
+        <span className="flex items-center gap-1 text-xs text-red-600" title={item.error}>
+          <XCircle className="h-3.5 w-3.5" />{" "}
+          {item.error?.includes("li_at") ? "Auth expired" : "Failed"}
         </span>
       );
     default:
