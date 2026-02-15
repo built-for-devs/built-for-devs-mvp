@@ -5,18 +5,48 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Loader2, Minus, Plus } from "lucide-react";
+import { formatEnumLabel } from "@/lib/admin/filter-options";
+import type { IcpCriteria } from "@/types/icp";
+import { ICP_CRITERIA_KEYS } from "@/types/icp";
+
+// Values match the goals column on the projects table
+const goalOptions = [
+  { value: "messaging_validation", label: "Messaging validation" },
+  { value: "pmf_assessment", label: "Product-market fit assessment" },
+  { value: "feature_feedback", label: "Feature feedback" },
+  { value: "documentation_review", label: "Documentation review" },
+  { value: "onboarding_flow_evaluation", label: "Onboarding flow evaluation" },
+  { value: "dx_assessment", label: "Developer experience assessment" },
+  { value: "competitive_comparison", label: "Competitive comparison" },
+  { value: "pricing_perception", label: "Pricing perception" },
+  { value: "api_sdk_usability", label: "API/SDK usability" },
+  { value: "time_to_first_value_measurement", label: "Time-to-first-value measurement" },
+];
+
+// Labels for displaying ICP criteria
+const criteriaLabels: Record<keyof IcpCriteria, string> = {
+  role_types: "Role Types",
+  seniority: "Seniority",
+  languages: "Languages",
+  frameworks: "Frameworks",
+  databases: "Databases",
+  cloud_platforms: "Cloud Platforms",
+  devops_tools: "DevOps Tools",
+  cicd_tools: "CI/CD Tools",
+  testing_frameworks: "Testing Frameworks",
+  api_experience: "API Experience",
+  operating_systems: "Operating Systems",
+  industries: "Industries",
+  company_size: "Company Size",
+  buying_influence: "Buying Influence",
+  paid_tools: "Paid Tools",
+  open_source_activity: "Open Source Activity",
+};
 
 interface SelectedProfile {
   jobTitle: string | null;
@@ -29,61 +59,112 @@ interface SelectedProfile {
   country: string | null;
 }
 
+type CheckoutMode = "icp" | "profiles";
+
 export function CheckoutForm() {
   const router = useRouter();
+
+  // Data from localStorage
+  const [mode, setMode] = useState<CheckoutMode | null>(null);
+  const [icpCriteria, setIcpCriteria] = useState<IcpCriteria | null>(null);
+  const [goals, setGoals] = useState<string[]>([]);
   const [profiles, setProfiles] = useState<SelectedProfile[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   // Form state
   const [productName, setProductName] = useState("");
   const [productUrl, setProductUrl] = useState("");
+  const [productDescription, setProductDescription] = useState("");
   const [contactName, setContactName] = useState("");
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
-  const [numEvaluations, setNumEvaluations] = useState(3);
+  const [numEvaluations, setNumEvaluations] = useState(10);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const pricePerEval = 399;
   const total = numEvaluations * pricePerEval;
 
-  // Load selected profiles from localStorage
+  // Load data from localStorage — prefer ICP criteria over profiles
   useEffect(() => {
-    const stored = localStorage.getItem("bfd_selected_profiles");
-    if (stored) {
+    // Try ICP criteria first (new wizard flow)
+    const storedCriteria = localStorage.getItem("bfd_icp_criteria");
+    if (storedCriteria) {
       try {
-        const parsed = JSON.parse(stored) as SelectedProfile[];
+        const parsed = JSON.parse(storedCriteria) as IcpCriteria;
+        const hasAnyCriteria = ICP_CRITERIA_KEYS.some(
+          (k) => Array.isArray(parsed[k]) && parsed[k].length > 0
+        );
+        if (hasAnyCriteria) {
+          setIcpCriteria(parsed);
+          setMode("icp");
+
+          // Pre-fill from wizard localStorage
+          const desc = localStorage.getItem("bfd_product_description");
+          if (desc) setProductDescription(desc);
+          const storedUrl = localStorage.getItem("bfd_product_url");
+          if (storedUrl) setProductUrl(storedUrl);
+
+          setLoaded(true);
+          return;
+        }
+      } catch {
+        // Invalid JSON — fall through
+      }
+    }
+
+    // Fall back to selected profiles (old flow)
+    const storedProfiles = localStorage.getItem("bfd_selected_profiles");
+    if (storedProfiles) {
+      try {
+        const parsed = JSON.parse(storedProfiles) as SelectedProfile[];
         if (Array.isArray(parsed) && parsed.length > 0) {
           setProfiles(parsed);
+          setMode("profiles");
           setNumEvaluations(Math.max(3, parsed.length));
           setLoaded(true);
           return;
         }
       } catch {
-        // Invalid JSON — fall through to redirect
+        // Invalid JSON — fall through
       }
     }
-    // No valid profiles — redirect to homepage
+
+    // No valid data — redirect to homepage
     router.replace("/");
   }, [router]);
+
+  // Get populated ICP criteria for display
+  const populatedCriteria = icpCriteria
+    ? ICP_CRITERIA_KEYS.filter((k) => icpCriteria[k].length > 0)
+    : [];
 
   async function handleCheckout() {
     setCheckoutLoading(true);
     setError(null);
 
     try {
+      const body: Record<string, unknown> = {
+        productName: productName.trim(),
+        productUrl: productUrl.trim(),
+        productDescription: productDescription.trim() || undefined,
+        email: email.trim(),
+        contactName: contactName.trim(),
+        companyName: companyName.trim(),
+        numEvaluations,
+      };
+
+      if (mode === "icp") {
+        body.icpCriteria = icpCriteria;
+        if (goals.length > 0) body.goals = goals;
+      } else {
+        body.selectedProfiles = profiles;
+      }
+
       const res = await fetch("/api/buy/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          selectedProfiles: profiles,
-          productName: productName.trim(),
-          productUrl: productUrl.trim(),
-          email: email.trim(),
-          contactName: contactName.trim(),
-          companyName: companyName.trim(),
-          numEvaluations,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -113,77 +194,86 @@ export function CheckoutForm() {
 
   return (
     <div className="space-y-10">
-      {/* Section A: Selected Developers */}
+      {/* Section A: Developer Criteria or Selected Profiles */}
       <div className="space-y-4">
         <div>
           <h1 className="text-2xl font-bold">
-            Get real developer feedback
+            Your developer criteria
           </h1>
-          <p className="mt-1 text-muted-foreground">
-            You&apos;ve selected {profiles.length} developer profile
-            {profiles.length !== 1 ? "s" : ""}. We&apos;ll match developers
-            like these from our network to evaluate your product.
-          </p>
+          {mode === "icp" ? (
+            <p className="mt-1 text-muted-foreground">
+              These are the criteria you selected. We&apos;ll use them to match the best developers from our network to evaluate your product.
+            </p>
+          ) : (
+            <p className="mt-1 text-muted-foreground">
+              You&apos;ve selected {profiles.length} developer profile
+              {profiles.length !== 1 ? "s" : ""}. We&apos;ll match developers
+              like these from our network to evaluate your product.
+            </p>
+          )}
         </div>
 
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
-            <TableHeader className="bg-muted/60">
-              <TableRow className="hover:bg-muted/60">
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Job Title</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seniority</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Languages</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Frameworks</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Country</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {profiles.map((dev, i) => (
-                <TableRow key={i}>
-                  <TableCell className="font-medium whitespace-nowrap">
-                    {dev.jobTitle ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm whitespace-nowrap">
-                    {dev.seniority ?? "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {dev.languages.length > 0
-                        ? dev.languages.slice(0, 3).map((l) => (
-                            <Badge
-                              key={l}
-                              variant="secondary"
-                              className="text-xs font-normal"
-                            >
-                              {l}
-                            </Badge>
-                          ))
-                        : "—"}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {dev.frameworks.length > 0
-                        ? dev.frameworks.slice(0, 3).map((f) => (
-                            <Badge
-                              key={f}
-                              variant="secondary"
-                              className="text-xs font-normal"
-                            >
-                              {f}
-                            </Badge>
-                          ))
-                        : "—"}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {dev.country ?? "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        {mode === "icp" && icpCriteria ? (
+          /* ICP criteria display as badge groups */
+          <div className="rounded-md border p-4 space-y-3">
+            {populatedCriteria.map((key) => (
+              <div key={key}>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {criteriaLabels[key]}
+                </span>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {icpCriteria[key].map((value) => (
+                    <Badge key={value} variant="secondary" className="text-xs font-normal">
+                      {formatEnumLabel(value)}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Legacy profiles table */
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/60">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Job Title</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seniority</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Languages</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Frameworks</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Country</th>
+                </tr>
+              </thead>
+              <tbody>
+                {profiles.map((dev, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="px-4 py-2 font-medium whitespace-nowrap">{dev.jobTitle ?? "—"}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">{dev.seniority ?? "—"}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        {dev.languages.length > 0
+                          ? dev.languages.slice(0, 3).map((l) => (
+                              <Badge key={l} variant="secondary" className="text-xs font-normal">{l}</Badge>
+                            ))
+                          : "—"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex flex-wrap gap-1">
+                        {dev.frameworks.length > 0
+                          ? dev.frameworks.slice(0, 3).map((f) => (
+                              <Badge key={f} variant="secondary" className="text-xs font-normal">{f}</Badge>
+                            ))
+                          : "—"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">{dev.country ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <Separator />
@@ -217,6 +307,43 @@ export function CheckoutForm() {
               placeholder="https://acme.dev"
             />
           </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Section B2: Evaluation Goals */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl font-semibold">What do you want to learn?</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Select what matters most — this helps us tailor your findings report.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {goalOptions.map((option) => (
+            <label
+              key={option.value}
+              className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 ${
+                goals.includes(option.value)
+                  ? "border-primary bg-primary/5"
+                  : "border-border"
+              }`}
+            >
+              <Checkbox
+                checked={goals.includes(option.value)}
+                onCheckedChange={(checked) => {
+                  setGoals((prev) =>
+                    checked
+                      ? [...prev, option.value]
+                      : prev.filter((v) => v !== option.value)
+                  );
+                }}
+                className="mt-0.5"
+              />
+              <span className="text-sm leading-snug">{option.label}</span>
+            </label>
+          ))}
         </div>
       </div>
 

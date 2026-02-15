@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getStripe } from "@/lib/stripe";
+import type { IcpCriteria } from "@/types/icp";
+import { ICP_CRITERIA_KEYS } from "@/types/icp";
 
 function createServiceClient() {
   return createClient(
@@ -21,14 +23,40 @@ interface SelectedProfile {
 }
 
 interface HomepageBuyRequest {
-  selectedProfiles: SelectedProfile[];
+  // Common fields
   productName: string;
   productUrl: string;
+  productDescription?: string;
   email: string;
   contactName: string;
   companyName: string;
   numEvaluations: number;
+  // ICP flow (new)
+  icpCriteria?: IcpCriteria;
+  goals?: string[];
+  // Profile flow (legacy)
+  selectedProfiles?: SelectedProfile[];
 }
+
+// Map IcpCriteria keys to project column names
+const icpColumnMap: Record<keyof IcpCriteria, string> = {
+  role_types: "icp_role_types",
+  seniority: "icp_seniority_levels",
+  languages: "icp_languages",
+  frameworks: "icp_frameworks",
+  databases: "icp_databases",
+  cloud_platforms: "icp_cloud_platforms",
+  devops_tools: "icp_devops_tools",
+  cicd_tools: "icp_cicd_tools",
+  testing_frameworks: "icp_testing_frameworks",
+  api_experience: "icp_api_experience",
+  operating_systems: "icp_operating_systems",
+  industries: "icp_industries",
+  company_size: "icp_company_size_range",
+  buying_influence: "icp_buying_influence",
+  paid_tools: "icp_paid_tools",
+  open_source_activity: "icp_open_source_activity",
+};
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as HomepageBuyRequest;
@@ -52,25 +80,53 @@ export async function POST(request: NextRequest) {
   if (!body.numEvaluations || body.numEvaluations < 3 || body.numEvaluations > 20) {
     return NextResponse.json({ error: "Number of evaluations must be between 3 and 20" }, { status: 400 });
   }
-  if (!body.selectedProfiles?.length) {
-    return NextResponse.json({ error: "At least one developer must be selected" }, { status: 400 });
+
+  // Must have either ICP criteria or selected profiles
+  const hasIcpCriteria = body.icpCriteria &&
+    ICP_CRITERIA_KEYS.some((k) => {
+      const values = body.icpCriteria?.[k];
+      return Array.isArray(values) && values.length > 0;
+    });
+  const hasProfiles = body.selectedProfiles && body.selectedProfiles.length > 0;
+
+  if (!hasIcpCriteria && !hasProfiles) {
+    return NextResponse.json({ error: "Developer criteria or selected profiles are required" }, { status: 400 });
   }
 
-  // Derive ICP from selected profiles (union of attributes)
-  const roleTypes = new Set<string>();
-  const seniorityLevels = new Set<string>();
-  const languages = new Set<string>();
-  const frameworks = new Set<string>();
-  const buyingInfluence = new Set<string>();
-  const paidTools = new Set<string>();
+  // Build ICP columns for the project
+  const icpColumns: Record<string, string[] | null> = {};
 
-  for (const profile of body.selectedProfiles) {
-    profile.roleTypes.forEach((r) => roleTypes.add(r));
-    profile.languages.forEach((l) => languages.add(l));
-    profile.frameworks.forEach((f) => frameworks.add(f));
-    profile.paidTools.forEach((t) => paidTools.add(t));
-    if (profile.seniority) seniorityLevels.add(profile.seniority);
-    if (profile.buyingInfluence) buyingInfluence.add(profile.buyingInfluence);
+  if (hasIcpCriteria && body.icpCriteria) {
+    // Direct ICP criteria — map to project columns
+    for (const key of ICP_CRITERIA_KEYS) {
+      const values = body.icpCriteria[key];
+      const column = icpColumnMap[key];
+      icpColumns[column] = Array.isArray(values) && values.length > 0 ? values : null;
+    }
+  } else if (hasProfiles && body.selectedProfiles) {
+    // Legacy profile-based flow — derive ICP from union of attributes
+    const roleTypes = new Set<string>();
+    const seniorityLevels = new Set<string>();
+    const languages = new Set<string>();
+    const frameworks = new Set<string>();
+    const buyingInfluence = new Set<string>();
+    const paidTools = new Set<string>();
+
+    for (const profile of body.selectedProfiles) {
+      profile.roleTypes.forEach((r) => roleTypes.add(r));
+      profile.languages.forEach((l) => languages.add(l));
+      profile.frameworks.forEach((f) => frameworks.add(f));
+      profile.paidTools.forEach((t) => paidTools.add(t));
+      if (profile.seniority) seniorityLevels.add(profile.seniority);
+      if (profile.buyingInfluence) buyingInfluence.add(profile.buyingInfluence);
+    }
+
+    icpColumns.icp_role_types = roleTypes.size ? [...roleTypes] : null;
+    icpColumns.icp_seniority_levels = seniorityLevels.size ? [...seniorityLevels] : null;
+    icpColumns.icp_languages = languages.size ? [...languages] : null;
+    icpColumns.icp_frameworks = frameworks.size ? [...frameworks] : null;
+    icpColumns.icp_buying_influence = buyingInfluence.size ? [...buyingInfluence] : null;
+    icpColumns.icp_paid_tools = paidTools.size ? [...paidTools] : null;
   }
 
   const supabase = createServiceClient();
@@ -121,19 +177,15 @@ export async function POST(request: NextRequest) {
       company_id: companyId,
       product_name: body.productName,
       product_url: body.productUrl,
+      product_description: body.productDescription || null,
       num_evaluations: numEvals,
       price_per_evaluation: pricePerEval,
       total_price: totalPrice,
       status: "draft",
       buyer_email: body.email,
       buyer_name: body.contactName,
-      // ICP fields derived from selected profiles
-      icp_role_types: roleTypes.size ? [...roleTypes] : null,
-      icp_seniority_levels: seniorityLevels.size ? [...seniorityLevels] : null,
-      icp_languages: languages.size ? [...languages] : null,
-      icp_frameworks: frameworks.size ? [...frameworks] : null,
-      icp_buying_influence: buyingInfluence.size ? [...buyingInfluence] : null,
-      icp_paid_tools: paidTools.size ? [...paidTools] : null,
+      goals: body.goals?.length ? body.goals : null,
+      ...icpColumns,
     })
     .select("id")
     .single();

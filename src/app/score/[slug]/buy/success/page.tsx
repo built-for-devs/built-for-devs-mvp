@@ -6,7 +6,8 @@ import type { Metadata } from "next";
 import type { ScoreEvaluation } from "@/lib/score/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Mail } from "lucide-react";
+import { CheckCircle2, KeyRound, Mail } from "lucide-react";
+import { ensureBuyerAccount } from "@/lib/account/ensure-buyer-account";
 
 function createServiceClient() {
   return createClient(
@@ -40,13 +41,52 @@ export default async function BuySuccessPage({ params }: PageProps) {
   const evaluation = (score as Record<string, unknown>).full_evaluation as ScoreEvaluation | null;
   const productName = evaluation?.product_name ?? (score as Record<string, unknown>).target_domain as string;
   const email = (score as Record<string, unknown>).email as string;
+  const buyerName = ((score as Record<string, unknown>).name as string) || null;
   const numEvals = (score as Record<string, unknown>).buy_num_evaluations as number | null;
+  const projectId = (score as Record<string, unknown>).buy_project_id as string | null;
+
+  // Auto-create company account (idempotent)
+  let accountCreated = false;
+  if (email && projectId) {
+    // Get company_id from the project
+    const { data: project } = await supabase
+      .from("projects")
+      .select("company_id")
+      .eq("id", projectId)
+      .single();
+
+    const companyId = project?.company_id as string | null;
+    if (companyId) {
+      accountCreated = await ensureBuyerAccount(
+        supabase,
+        email,
+        buyerName,
+        companyId,
+        projectId
+      );
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
-          <Link href="/"><Image src="/website-logo.png" alt="Built for Devs" width={1147} height={566} className="h-9 w-auto dark:hidden" /><Image src="/website-logo-dark.png" alt="Built for Devs" width={1147} height={566} className="hidden h-9 w-auto dark:block" /></Link>
+          <Link href="/">
+            <Image
+              src="/website-logo.png"
+              alt="Built for Devs"
+              width={1147}
+              height={566}
+              className="h-9 w-auto dark:hidden"
+            />
+            <Image
+              src="/website-logo-dark.png"
+              alt="Built for Devs"
+              width={1147}
+              height={566}
+              className="hidden h-9 w-auto dark:block"
+            />
+          </Link>
           <span className="text-xs text-muted-foreground">
             Developer Evaluations
           </span>
@@ -88,8 +128,8 @@ export default async function BuySuccessPage({ params }: PageProps) {
                     2
                   </span>
                   <span>
-                    Each developer will try your product cold and record their
-                    screen + honest reactions.
+                    Each developer will use your product for the first time and
+                    record their screen + honest reactions.
                   </span>
                 </li>
                 <li className="flex gap-3">
@@ -112,19 +152,35 @@ export default async function BuySuccessPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Create a free account to track your evaluations in real-time.
-            </p>
-            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Button asChild>
-                <Link href="/signup">Create Account</Link>
-              </Button>
+          {accountCreated && email ? (
+            <Card>
+              <CardContent className="space-y-3 p-6 text-left">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-muted-foreground" />
+                  <h2 className="font-semibold">Your account is ready</h2>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  We&apos;ve created an account for <strong>{email}</strong>.
+                  Set a password to log in and track your evaluations in
+                  real-time.
+                </p>
+                <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+                  <Button asChild>
+                    <Link href="/forgot-password">Set Your Password</Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link href={`/score/${slug}`}>View Your Score Report</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
               <Button variant="outline" asChild>
                 <Link href={`/score/${slug}`}>View Your Score Report</Link>
               </Button>
             </div>
-          </div>
+          )}
         </div>
       </main>
     </div>
