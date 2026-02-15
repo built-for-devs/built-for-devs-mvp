@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getProjectById } from "@/lib/admin/queries";
+import { getProjectById, getMatchCandidates } from "@/lib/admin/queries";
+import { scoreAndRankDevelopers } from "@/lib/admin/icp-matching";
+import { RecommendedMatches } from "./recommended-matches";
 import { formatEnumLabel } from "@/lib/admin/filter-options";
 import { PageHeader } from "@/components/admin/page-header";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -18,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { ProjectActions } from "./project-actions";
 import { EditProjectDialog } from "./edit-project-dialog";
+import { DeleteProjectButton } from "./delete-project-button";
 
 export default async function AdminProjectDetailPage({
   params,
@@ -33,6 +36,11 @@ export default async function AdminProjectDetailPage({
   const { project, evaluations } = result;
   const approvedEvals = evaluations.filter((e) => e.status === "approved");
   const paidEvals = evaluations.filter((e) => e.status === "paid");
+
+  // ICP-based developer matching
+  const candidates = await getMatchCandidates(supabase);
+  const excludeIds = new Set(evaluations.map((e) => e.developers.id));
+  const matches = scoreAndRankDevelopers(project, candidates, excludeIds, 20);
 
   // ICP criteria — show only non-empty fields
   const icpFields: { label: string; value: string[] | number | null }[] = [
@@ -63,6 +71,7 @@ export default async function AdminProjectDetailPage({
     <div className="space-y-8">
       <PageHeader title={project.product_name}>
         <EditProjectDialog project={project} />
+        <DeleteProjectButton projectId={project.id} projectName={project.product_name} />
         <StatusBadge status={project.status} type="project" />
       </PageHeader>
 
@@ -180,6 +189,13 @@ export default async function AdminProjectDetailPage({
           </dl>
         </CardContent>
       </Card>
+
+      {/* ===== RECOMMENDED DEVELOPERS ===== */}
+      <RecommendedMatches
+        matches={matches}
+        projectId={project.id}
+        hasIcpCriteria={icpFields.length > 0}
+      />
 
       {/* ===== INTERACTIVE SECTIONS (Client) ===== */}
       <ProjectActions

@@ -278,6 +278,28 @@ export async function updateProject(
     product_category?: string;
     num_evaluations?: number;
     price_per_evaluation?: number;
+    evaluation_scope?: string | null;
+    setup_instructions?: string | null;
+    time_to_value_milestone?: string | null;
+    goals?: string[] | null;
+    icp_role_types?: string[] | null;
+    icp_min_experience?: number | null;
+    icp_seniority_levels?: string[] | null;
+    icp_languages?: string[] | null;
+    icp_frameworks?: string[] | null;
+    icp_databases?: string[] | null;
+    icp_cloud_platforms?: string[] | null;
+    icp_devops_tools?: string[] | null;
+    icp_cicd_tools?: string[] | null;
+    icp_testing_frameworks?: string[] | null;
+    icp_api_experience?: string[] | null;
+    icp_operating_systems?: string[] | null;
+    icp_company_size_range?: string[] | null;
+    icp_industries?: string[] | null;
+    icp_team_size_range?: string[] | null;
+    icp_buying_influence?: string[] | null;
+    icp_paid_tools?: string[] | null;
+    icp_open_source_activity?: string[] | null;
   }
 ): Promise<ActionResult> {
   const supabase = await createClient();
@@ -294,6 +316,29 @@ export async function updateProject(
 
   if (error) return { success: false, error: error.message };
   revalidatePath(`/admin/projects/${projectId}`);
+  revalidatePath("/admin/projects");
+  return { success: true };
+}
+
+export async function deleteProject(
+  projectId: string
+): Promise<ActionResult> {
+  const supabase = createServiceClient();
+
+  // Delete evaluations first (foreign key constraint)
+  const { error: evalError } = await supabase
+    .from("evaluations")
+    .delete()
+    .eq("project_id", projectId);
+
+  if (evalError) return { success: false, error: evalError.message };
+
+  const { error } = await supabase
+    .from("projects")
+    .delete()
+    .eq("id", projectId);
+
+  if (error) return { success: false, error: error.message };
   revalidatePath("/admin/projects");
   return { success: true };
 }

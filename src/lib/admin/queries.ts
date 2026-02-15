@@ -354,6 +354,22 @@ export async function getProjectById(supabase: Client, id: string) {
 }
 
 // ============================================================
+// ICP MATCH CANDIDATES
+// ============================================================
+
+export async function getMatchCandidates(
+  supabase: Client
+): Promise<DeveloperWithProfile[]> {
+  const { data } = await supabase
+    .from("developers")
+    .select("*, profiles!inner(full_name, email, avatar_url)")
+    .neq("profiles.role", "admin")
+    .eq("is_available", true);
+
+  return (data as unknown as DeveloperWithProfile[]) ?? [];
+}
+
+// ============================================================
 // EVALUATIONS
 // ============================================================
 
